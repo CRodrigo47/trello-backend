@@ -10,7 +10,6 @@ import java.util.List;
 
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -35,7 +34,7 @@ public class UserController {
     }
 
     @GetMapping("/{id}")
-    public User getUserById(@RequestParam Long id) {
+    public User getUserById(@PathVariable Long id) {
         return userService.getUserById(id).orElse(null);
     }
 
