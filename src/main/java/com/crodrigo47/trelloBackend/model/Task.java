@@ -1,4 +1,4 @@
-package com.example.demo.model;
+package com.crodrigo47.trelloBackend.model;
 
 import jakarta.persistence.*;
 import lombok.*;

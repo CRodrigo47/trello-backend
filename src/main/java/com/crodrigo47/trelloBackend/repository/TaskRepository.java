@@ -1,6 +1,7 @@
-package com.example.demo.repository;
+package com.crodrigo47.trelloBackend.repository;
 
-import com.example.demo.model.Task;
 import org.springframework.data.jpa.repository.JpaRepository;
+
+import com.crodrigo47.trelloBackend.model.Task;
 
 public interface TaskRepository extends JpaRepository<Task, Long> { }

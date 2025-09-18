@@ -1,8 +1,9 @@
-package com.example.demo.controller;
+package com.crodrigo47.trelloBackend.controller;
 
-import com.example.demo.model.User;
-import com.example.demo.repository.UserRepository;
 import org.springframework.web.bind.annotation.*;
+
+import com.crodrigo47.trelloBackend.model.User;
+import com.crodrigo47.trelloBackend.repository.UserRepository;
 
 @RestController
 @RequestMapping("/auth")

@@ -1,12 +1,12 @@
-package com.example.demo.service;
+package com.crodrigo47.trelloBackend.service;
 
 import java.util.List;
 import java.util.Optional;
 
 import org.springframework.stereotype.Service;
 
-import com.example.demo.model.Board;
-import com.example.demo.repository.BoardRepository;
+import com.crodrigo47.trelloBackend.model.Board;
+import com.crodrigo47.trelloBackend.repository.BoardRepository;
 
 @Service
 public class BoardService {

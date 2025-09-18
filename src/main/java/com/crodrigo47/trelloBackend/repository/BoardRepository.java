@@ -1,6 +1,7 @@
-package com.example.demo.repository;
+package com.crodrigo47.trelloBackend.repository;
 
-import com.example.demo.model.Board;
 import org.springframework.data.jpa.repository.JpaRepository;
+
+import com.crodrigo47.trelloBackend.model.Board;
 
 public interface BoardRepository extends JpaRepository<Board, Long> { }

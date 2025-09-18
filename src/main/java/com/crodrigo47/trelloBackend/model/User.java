@@ -1,4 +1,4 @@
-package com.example.demo.model;
+package com.crodrigo47.trelloBackend.model;
 
 import jakarta.persistence.*;
 import lombok.*;
@@ -21,7 +21,6 @@ public class User {
     private String username;
     
     private String email;
-    private String password;
 
     @ManyToMany(mappedBy = "users")
     private Set<Board> boards;

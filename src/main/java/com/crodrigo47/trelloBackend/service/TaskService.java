@@ -1,12 +1,12 @@
-package com.example.demo.service;
+package com.crodrigo47.trelloBackend.service;
 
 import java.util.List;
 import java.util.Optional;
 
 import org.springframework.stereotype.Service;
 
-import com.example.demo.model.Task;
-import com.example.demo.repository.TaskRepository;
+import com.crodrigo47.trelloBackend.model.Task;
+import com.crodrigo47.trelloBackend.repository.TaskRepository;
 
 @Service
 public class TaskService {

@@ -1,10 +1,10 @@
-package com.example.demo.controller;
+package com.crodrigo47.trelloBackend.controller;
 
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import com.example.demo.model.User;
-import com.example.demo.service.UserService;
+import com.crodrigo47.trelloBackend.model.User;
+import com.crodrigo47.trelloBackend.service.UserService;
 
 import java.util.List;
 
