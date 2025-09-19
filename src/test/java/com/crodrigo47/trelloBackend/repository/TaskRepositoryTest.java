@@ -8,6 +8,7 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
+import org.springframework.dao.DataIntegrityViolationException;
 
 import com.crodrigo47.trelloBackend.helper.Builders;
 import com.crodrigo47.trelloBackend.model.Board;
@@ -50,7 +51,7 @@ class TaskRepositoryTest {
     }
 
     @Test
-    void findyByBoard_returnsTaskFromThatBoard(){
+    void getAllBoards_returnsList(){
         Board board = boardRepository.save(Builders.buildBoard("Programación"));
         User user = userRepository.save(Builders.buildUser("alice"));
 
@@ -76,5 +77,90 @@ class TaskRepositoryTest {
     }).isInstanceOf(Exception.class);
     }
 
+    @Test
+    void findByBoardId_returnList(){
+         Board board = boardRepository.save(Builders.buildBoard("Programación"));
+         User user = userRepository.save(Builders.buildUser("alice"));
+
+          taskRepository.save(Builders.buildTask("tarea1", board, user));
+          taskRepository.save(Builders.buildTask("tarea2", board, user));
+
+        List<Task> result = taskRepository.findByBoardId(board.getId());
+
+        assertThat(result).hasSize(2);
+        assertThat(result)
+            .extracting(Task::getTitle).containsExactlyInAnyOrder("tarea1", "tarea2");
+    }
+
+    @Test
+    void findByAssignedToId_returnList(){
+          Board board = boardRepository.save(Builders.buildBoard("Programación"));
+          User user = userRepository.save(Builders.buildUser("alice"));
+
+          taskRepository.save(Builders.buildTask("tarea1", board, user));
+          taskRepository.save(Builders.buildTask("tarea2", board, user));
+
+        List<Task> result = taskRepository.findByAssignedToId(user.getId());
+
+        assertThat(result).hasSize(2);
+        assertThat(result)
+            .extracting(Task::getTitle).containsExactlyInAnyOrder("tarea1", "tarea2");
+    }
+
+    @Test
+    void findByAssignedStatus_returnList(){
+         Board board = boardRepository.save(Builders.buildBoard("Programación"));
+         User user = userRepository.save(Builders.buildUser("alice"));
+
+          taskRepository.save(Builders.buildTaskWithStatus("tarea1", board, user, Task.Status.DONE));
+          taskRepository.save(Builders.buildTaskWithStatus("tarea2", board, user, Task.Status.FUTURE));
+          taskRepository.save(Builders.buildTaskWithStatus("tarea3", board, user, Task.Status.FUTURE));
+
+        List<Task> result = taskRepository.findByStatus(Task.Status.DONE);
+
+        assertThat(result).hasSize(1);
+        assertThat(result)
+            .extracting(Task::getTitle).containsExactlyInAnyOrder("tarea1");
+
+             List<Task> result2 = taskRepository.findByStatus(Task.Status.FUTURE);
+
+        assertThat(result2).hasSize(2);
+        assertThat(result2)
+            .extracting(Task::getTitle).containsExactlyInAnyOrder("tarea2", "tarea3");
+    }
+
+    @Test
+    void deleteCascade_returnEmpty(){
+         Board board = boardRepository.save(Builders.buildBoard("Programación"));
+         User user = userRepository.save(Builders.buildUser("alice"));
+
+        Task task1 = taskRepository.save(Builders.buildTask("tarea1", board, user));
+        Task task2 = taskRepository.save(Builders.buildTask("tarea2", board, user));
+
+        board.addTask(task1);
+        board.addTask(task2);
+
+        boardRepository.save(board);
+
+        boardRepository.delete(board);
+
+        assertThat(taskRepository.findAll()).isEmpty();
+    }
     
+    @Test
+    void saveOnNonExistentBoard_returnException() {
+        Task task = new Task();
+            task.setTitle("Tarea");
+
+        Board fakeBoard = new Board();
+            fakeBoard.setId(999L); // ID que no existe
+
+            task.setBoard(fakeBoard);
+            task.setAssignedTo(userRepository.save(Builders.buildUser("bob")));
+
+        assertThatThrownBy(() -> taskRepository.saveAndFlush(task))
+            .isInstanceOf(DataIntegrityViolationException.class);
+
+    }
+
 }

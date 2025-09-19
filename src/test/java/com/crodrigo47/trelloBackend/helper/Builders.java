@@ -52,6 +52,16 @@ public class Builders {
          return task;
     }
 
+    public static Task buildTaskWithStatus(String title, Board board, User assignedTo, Task.Status status) {
+         Task task = new Task();
+         task.setTitle(title);
+         task.setDescription("Descripción de " + title);
+         task.setStatus(status);
+         task.setBoard(board);
+         task.setAssignedTo(assignedTo);
+         return task;
+    }
+
         public static Task buildTaskWithId(String title, Long id, Board board, User assignedTo) {
          Task task = new Task();
          task.setTitle(title);
