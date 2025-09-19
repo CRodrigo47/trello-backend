@@ -35,7 +35,8 @@ public class UserController {
 
     @GetMapping("/{id}")
     public User getUserById(@PathVariable Long id) {
-        return userService.getUserById(id).orElse(null);
+        return userService.getUserById(id)
+                .orElseThrow(() -> new com.crodrigo47.trelloBackend.exception.UserNotFoundException("User id " + id + " not found"));
     }
 
     @PostMapping

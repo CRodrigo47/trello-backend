@@ -36,7 +36,8 @@ public class BoardController {
 
     @GetMapping("/{id}")
     public Board getBoardById(@PathVariable Long id) {
-        return boardService.getBoardById(id).orElse(null);
+        return boardService.getBoardById(id)
+        .orElseThrow(() -> new com.crodrigo47.trelloBackend.exception.BoardNotFoundException("Board id " + id + " not found."));
     }
     
     @PostMapping

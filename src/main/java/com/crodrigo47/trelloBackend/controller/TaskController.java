@@ -35,7 +35,8 @@ public class TaskController {
 
     @GetMapping("/{id}")
     public Task getTaskById(@PathVariable Long id) {
-        return taskService.getTaskById(id).orElse(null);
+        return taskService.getTaskById(id)
+        .orElseThrow(() -> new com.crodrigo47.trelloBackend.exception.TaskNotFoundException("Task id " + id + " not found."));
     }
     
     @PostMapping

@@ -9,6 +9,7 @@ import java.time.LocalDateTime;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
+@Builder
 public class Task {
 
     @Id
@@ -26,7 +27,7 @@ public class Task {
     private User assignedTo;
 
     @ManyToOne
-    @JoinColumn(name = "board_id")
+    @JoinColumn(name = "board_id", nullable = false)
     private Board board;
 
     private LocalDateTime createdAt;
