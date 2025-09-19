@@ -6,7 +6,8 @@ import lombok.*;
 import java.util.Set;
 
 @Entity
-@Data
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
@@ -27,6 +28,27 @@ public class Board {
     )
     private Set<User> users;
 
-    @OneToMany(mappedBy = "board", cascade = CascadeType.ALL)
+    public void addUser(User u){
+        users.add(u);
+        u.getBoards().add(this);
+    }
+
+    public void removeUser(User u){
+        users.remove(u);
+        u.getBoards().remove(this);
+    }
+
+    @OneToMany(mappedBy = "board", cascade = CascadeType.ALL, orphanRemoval = true)
     private Set<Task> tasks;
+
+    public void addTask(Task t){
+        tasks.add(t);
+        t.setBoard(this);
+    }
+
+    public void removeTask(Task t){
+        tasks.remove(t);
+        t.setBoard(null);
+    }
+
 }

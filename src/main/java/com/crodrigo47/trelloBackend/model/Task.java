@@ -6,7 +6,8 @@ import lombok.*;
 import java.time.LocalDateTime;
 
 @Entity
-@Data
+@Getter
+@Setter
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
@@ -25,6 +26,18 @@ public class Task {
     @ManyToOne
     @JoinColumn(name = "assigned_to_id")
     private User assignedTo;
+
+    public void assignUser(User u) {
+        this.assignedTo = u;    
+        u.addTask(this);        
+    }
+
+    public void unassignUser() {
+        if (this.assignedTo != null) {
+            this.assignedTo.removeTask(this);
+            this.assignedTo = null;           
+        }
+    }
 
     @ManyToOne
     @JoinColumn(name = "board_id", nullable = false)

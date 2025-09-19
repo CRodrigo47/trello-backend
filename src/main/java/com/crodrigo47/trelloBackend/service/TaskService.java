@@ -6,6 +6,7 @@ import java.util.Optional;
 import org.springframework.stereotype.Service;
 
 import com.crodrigo47.trelloBackend.model.Task;
+import com.crodrigo47.trelloBackend.model.User;
 import com.crodrigo47.trelloBackend.repository.TaskRepository;
 
 @Service
@@ -37,5 +38,22 @@ public class TaskService {
 
     public void deleteTask(Long id){
         taskRepository.deleteById(id);
+    }
+
+    public Task assignTaskToUser(Long id, User user){
+        Task task = taskRepository.findById(id)
+        .orElseThrow(() -> new com.crodrigo47.trelloBackend.exception.TaskNotFoundException("Task " + id + " not found."));
+
+        task.assignUser(user);
+        return taskRepository.save(task);
+    }
+
+    public Task unassignTaskFromUser(Long id){
+        Task task = taskRepository.findById(id)
+        .orElseThrow(() -> new com.crodrigo47.trelloBackend.exception.TaskNotFoundException("Task " + id + " not found."));
+
+        task.unassignUser();
+        
+        return taskRepository.save(task);
     }
 }
