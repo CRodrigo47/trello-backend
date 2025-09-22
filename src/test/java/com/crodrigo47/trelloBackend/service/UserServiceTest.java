@@ -42,4 +42,11 @@ class UserServiceTest {
         assertThat(result).isPresent();
         assertThat(result.get().getUsername()).isEqualTo("bob");
     }
+
+    @Test
+    void deleteUser_callsRepository(){
+        userService.deleteUser(10L);
+
+        verify(userRepository).deleteById(10L);
+    }
 }

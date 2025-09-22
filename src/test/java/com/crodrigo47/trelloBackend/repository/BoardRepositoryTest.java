@@ -11,6 +11,8 @@ import com.crodrigo47.trelloBackend.model.Board;
 import com.crodrigo47.trelloBackend.model.Task;
 import com.crodrigo47.trelloBackend.model.User;
 
+import jakarta.transaction.Transactional;
+
 @DataJpaTest
 class BoardRepositoryTest {
     
@@ -30,6 +32,7 @@ class BoardRepositoryTest {
         assertThat(board.getId()).isNotNull();
     }
 
+    @Transactional
     @Test
     void lazy_or_eager_loading(){
         Board board = boardRepository.save(Builders.buildBoard("Diseño"));

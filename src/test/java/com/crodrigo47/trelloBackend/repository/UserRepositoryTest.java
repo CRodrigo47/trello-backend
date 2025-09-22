@@ -18,7 +18,7 @@ class UserRepositoryTest {
 
     @Test
     void findByUsername_returnsUser() {
-        User saved = userRepository.save(User.builder().username("alice").email("alice@mail.com").build());
+        User saved = userRepository.save(Builders.buildUser("alice"));
 
         var found = userRepository.findByUsername("alice");
 

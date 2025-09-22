@@ -12,6 +12,7 @@ public class Builders {
             return User.builder()
                .username(username)
                .email(username + "@mail.com")
+               .password(username)
                .build();
     }
 
@@ -20,6 +21,7 @@ public class Builders {
                .username(username)
                .id(id)
                .email(username + "@mail.com")
+               .password(username)
                .build();
     }
 
