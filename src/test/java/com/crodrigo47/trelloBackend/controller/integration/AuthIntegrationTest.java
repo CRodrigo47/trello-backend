@@ -20,7 +20,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest(properties = "spring.profiles.active=test")
 @AutoConfigureMockMvc(addFilters = false)
 @TestPropertySource(properties = {
-    "jwt.secret=supersecuretestkeythatisatleast32bytes!",
+    "jwt.secret=${JWT_TEST_SECRET:supersecuretestkeythatisatleast32bytes!}",
     "jwt.expiration-ms=3600000"
 })
 class AuthIntegrationTest {
@@ -34,31 +34,30 @@ class AuthIntegrationTest {
         userRepository.deleteAll();
     }
 
-   @Test
-void login_createsUserInDb() throws Exception {
-    String username = "fran";
-    String password = "supersecret";
+    @Test
+    void login_createsUserInDb() throws Exception {
+        String username = "fran";
+        String password = "supersecret";
 
-    String response = mockMvc.perform(post("/auth/login")
-            .contentType(MediaType.APPLICATION_JSON)
-            .content(mapper.writeValueAsString(Map.of(
-                    "username", username,
-                    "password", password
-            ))))
-            .andExpect(status().isOk())
-            .andReturn().getResponse().getContentAsString();
+        String response = mockMvc.perform(post("/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(mapper.writeValueAsString(Map.of(
+                        "username", username,
+                        "password", password
+                ))))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
 
-    Map<String, Object> jsonResponse = mapper.readValue(
-        response, new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {}
-    );
+        Map<String, Object> jsonResponse = mapper.readValue(
+            response, new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {}
+        );
 
-    assertThat(jsonResponse.get("username")).isEqualTo(username);
-    assertThat(jsonResponse.get("token")).isNotNull();
+        assertThat(jsonResponse.get("username")).isEqualTo(username);
+        assertThat(jsonResponse.get("token")).isNotNull();
 
-    // Verificar que el usuario se creó en la DB
-    var userOpt = userRepository.findByUsername(username);
-    assertThat(userOpt).isPresent();
-    assertThat(userOpt.get().getPassword()).isNotEqualTo(password);
-}
-
+        // Verificar que el usuario se creó en la DB
+        var userOpt = userRepository.findByUsername(username);
+        assertThat(userOpt).isPresent();
+        assertThat(userOpt.get().getPassword()).isNotEqualTo(password);
+    }
 }
