@@ -56,4 +56,16 @@ public class TaskService {
         
         return taskRepository.save(task);
     }
+
+    public List<Task> getTasksByBoard(Long boardId) {
+        return taskRepository.findByBoardId(boardId);
+    }
+
+    public List<Task> getTasksByUser(Long userId) {
+        return taskRepository.findByAssignedToId(userId);
+    }
+
+    public List<Task> getTasksByStatus(Task.Status status) {
+        return taskRepository.findByStatus(status);
+    }
 }

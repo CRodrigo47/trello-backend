@@ -5,6 +5,8 @@ import lombok.*;
 
 import java.time.LocalDateTime;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
 @Entity
 @Getter
 @Setter
@@ -41,6 +43,7 @@ public class Task {
 
     @ManyToOne
     @JoinColumn(name = "board_id", nullable = false)
+    @JsonIgnore
     private Board board;
 
     private LocalDateTime createdAt;
@@ -50,5 +53,16 @@ public class Task {
         FUTURE,
         IN_PROGRESS,
         DONE
+    }
+
+    @PrePersist
+    public void onCreate() {
+        this.createdAt = LocalDateTime.now();
+        this.updatedAt = LocalDateTime.now();
+    }
+
+    @PreUpdate
+    public void onUpdate() {
+        this.updatedAt = LocalDateTime.now();
     }
 }

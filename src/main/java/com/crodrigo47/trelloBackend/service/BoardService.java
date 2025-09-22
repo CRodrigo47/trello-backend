@@ -14,9 +14,11 @@ import com.crodrigo47.trelloBackend.repository.BoardRepository;
 public class BoardService {
     
     private final BoardRepository boardRepository;
+    private final TaskService taskService;
 
-    public BoardService(BoardRepository boardRepository){
+    public BoardService(BoardRepository boardRepository, TaskService taskService){
         this.boardRepository = boardRepository;
+        this.taskService = taskService;
     }
 
     public List<Board> getAllBoards() {
@@ -49,9 +51,16 @@ public class BoardService {
 
     public void removeTaskFromBoard(Long id, Task task){
         Board board = boardRepository.findById(id)
-        .orElseThrow(() -> new com.crodrigo47.trelloBackend.exception.BoardNotFoundException("Board " + id + " not found"));
+        .orElseThrow(() -> new RuntimeException("Board not found"));
+
+        if (!board.getTasks().contains(task)) {
+        throw new RuntimeException("Task not in this board");
+        }
 
         board.removeTask(task);
+        boardRepository.save(board);
+
+        taskService.deleteTask(task.getId());
     }
 
     public Board addUserToBoard(Long id, User user){

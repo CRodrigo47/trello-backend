@@ -5,6 +5,8 @@ import lombok.*;
 
 import java.util.Set;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
 @Entity
 @Getter
 @Setter
@@ -24,6 +26,7 @@ public class User {
     private String email;
 
     @ManyToMany(mappedBy = "users")
+    @JsonIgnore
     private Set<Board> boards;
 
     public void addBoard(Board b){
@@ -37,6 +40,7 @@ public class User {
     }
     
     @OneToMany(mappedBy = "assignedTo")
+    @JsonIgnore
     private Set<Task> tasks;
 
     public void addTask(Task t){

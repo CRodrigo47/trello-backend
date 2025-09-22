@@ -47,7 +47,7 @@ class UserControllerTest {
     @Test
     void createUser_returnsCreatedUser() throws Exception {
         User input = Builders.buildUser("charlie");
-        when(userService.creatUser(input)).thenReturn(Builders.buildUserWithId("charlie", 2L));
+        when(userService.createUser(input)).thenReturn(Builders.buildUserWithId("charlie", 2L));
 
         mockMvc.perform(post("/user")
             .contentType(MediaType.APPLICATION_JSON)

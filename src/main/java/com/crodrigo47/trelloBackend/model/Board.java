@@ -5,6 +5,8 @@ import lombok.*;
 
 import java.util.Set;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
 @Entity
 @Getter
 @Setter
@@ -26,6 +28,7 @@ public class Board {
         joinColumns = @JoinColumn(name = "board_id"),
         inverseJoinColumns = @JoinColumn(name = "user_id")
     )
+    @JsonIgnore
     private Set<User> users;
 
     public void addUser(User u){
@@ -39,6 +42,7 @@ public class Board {
     }
 
     @OneToMany(mappedBy = "board", cascade = CascadeType.ALL, orphanRemoval = true)
+    @JsonIgnore
     private Set<Task> tasks;
 
     public void addTask(Task t){

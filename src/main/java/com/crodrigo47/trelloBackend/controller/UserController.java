@@ -19,7 +19,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 
 
 @RestController
-@RequestMapping("/user")
+@RequestMapping("/users")
 public class UserController {
     
     private final UserService userService;
@@ -42,7 +42,7 @@ public class UserController {
     @PostMapping
     public User createUser(@RequestBody User user) {
         
-        return userService.creatUser(user);
+        return userService.createUser(user);
     }
 
     @PutMapping("/{id}")
