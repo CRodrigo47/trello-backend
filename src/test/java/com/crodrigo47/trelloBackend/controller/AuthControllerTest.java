@@ -37,7 +37,7 @@ class AuthControllerTest {
 
     @Test
     void login_returnsExistingUser() throws Exception {
-        String rawPassword = "V4E8r9dYp2sM6aT1qW3kZx7nBbC0L2fH"; // debe ser >=32 chars
+        String rawPassword = "V4E8r9dYp2sM6aT1qW3kZx7nBbC0L2fH";
         String encodedPassword = passwordEncoder.encode(rawPassword);
 
         when(userRepository.findByUsername("dave"))

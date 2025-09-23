@@ -16,6 +16,7 @@ import java.util.List;
 import java.util.Optional;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -50,14 +51,38 @@ class UserControllerTest {
     @Test
     void createUser_returnsCreatedUser() throws Exception {
         User saved = Builders.buildUserWithId("charlie", 2L);
-    
+
         when(userService.createUser(any(User.class))).thenReturn(saved);
-    
+
         mockMvc.perform(post("/users")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(mapper.writeValueAsString(Builders.buildUser("charlie"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(2))
                 .andExpect(jsonPath("$.username").value("charlie"));
+    }
+
+    @Test
+    void updateUser_returnsUpdatedUser() throws Exception{
+        User saved = Builders.buildUserWithId("bob", 1L);
+
+        when(userService.updateUser(any(User.class))).thenReturn(saved);
+
+        mockMvc.perform(put("/users/" + saved.getId())
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(mapper.writeValueAsString(saved)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.id").value(saved.getId()))
+        .andExpect(jsonPath("$.username").value(saved.getUsername()));
+    }
+
+    @Test
+    void deleteUser_callsService() throws Exception{
+         Long userId = 1L;
+
+        mockMvc.perform(delete("/users/" + userId))
+            .andExpect(status().isOk());
+
+        verify(userService).deleteUser(userId);
     }
 }
