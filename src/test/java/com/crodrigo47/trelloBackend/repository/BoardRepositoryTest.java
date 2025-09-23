@@ -2,6 +2,8 @@ package com.crodrigo47.trelloBackend.repository;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import java.util.List;
+
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
@@ -31,6 +33,24 @@ class BoardRepositoryTest {
 
         assertThat(board.getId()).isNotNull();
     }
+
+    @Test
+    void findByName_returnsMatchingBoards() {
+
+    boardRepository.save(Builders.buildBoard("Diseño"));
+    boardRepository.save(Builders.buildBoard("Diseño"));
+    boardRepository.save(Builders.buildBoard("Programación"));
+
+    List<Board> result = boardRepository.findByName("Diseño");
+    List<Board> resultEmpty = boardRepository.findByName("Marketing");
+
+    assertThat(resultEmpty).isEmpty();
+    assertThat(result).hasSize(2);
+    assertThat(result)
+        .extracting(Board::getName)
+        .containsOnly("Diseño");
+}
+
 
     @Transactional
     @Test
