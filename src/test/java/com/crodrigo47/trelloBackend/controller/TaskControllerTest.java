@@ -81,6 +81,7 @@ class TaskControllerTest {
     @Test
     void updateTask_returnsUpdatedTask() throws Exception {
         Task updated = Builders.buildTaskWithId("UpdatedTask", 1L, null, null);
+        when(taskService.getTaskById(1L)).thenReturn(Optional.of(Builders.buildTaskWithId("OldTitle", 1L, null, null)));
         when(taskService.updateTask(any(Task.class))).thenReturn(updated);
 
         var expectedDto = BuildersDto.buildTaskDtoWithId("UpdatedTask", 1L);

@@ -75,7 +75,7 @@ public class BoardController {
 
     @PostMapping("/{boardId}/tasks")
     public BoardDto addTaskToBoard(@PathVariable Long boardId, @RequestBody Task task) {
-        return DtoMapper.toBoardDto(boardService.addTaskToBoard(boardId, task));
+        return DtoMapper.toBoardDto(boardService.addTaskToBoard(boardId, task.getId()));
     }
 
     @DeleteMapping("/{boardId}/tasks/{taskId}")

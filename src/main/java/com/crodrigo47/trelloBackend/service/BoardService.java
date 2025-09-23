@@ -7,24 +7,30 @@ import java.util.Set;
 import org.springframework.stereotype.Service;
 
 import com.crodrigo47.trelloBackend.exception.BoardNotFoundException;
+import com.crodrigo47.trelloBackend.exception.TaskNotFoundException;
 import com.crodrigo47.trelloBackend.exception.UserNotFoundException;
 import com.crodrigo47.trelloBackend.model.Board;
 import com.crodrigo47.trelloBackend.model.Task;
 import com.crodrigo47.trelloBackend.model.User;
 import com.crodrigo47.trelloBackend.repository.BoardRepository;
+import com.crodrigo47.trelloBackend.repository.TaskRepository;
 import com.crodrigo47.trelloBackend.repository.UserRepository;
+
+import jakarta.transaction.Transactional;
 
 @Service
 public class BoardService {
     
     private final BoardRepository boardRepository;
     private final UserRepository userRepository;
+    private final TaskRepository taskRepository;
     private final TaskService taskService;
 
-    public BoardService(BoardRepository boardRepository, TaskService taskService, UserRepository userRepository){
+    public BoardService(BoardRepository boardRepository, TaskService taskService, UserRepository userRepository, TaskRepository taskRepository){
         this.boardRepository = boardRepository;
         this.taskService = taskService;
         this.userRepository = userRepository;
+        this.taskRepository = taskRepository;
     }
 
     public List<Board> getAllBoards() {
@@ -47,10 +53,14 @@ public class BoardService {
         boardRepository.deleteById(id);
     }
 
-    public Board addTaskToBoard(Long boardId, Task task){
+    @Transactional
+    public Board addTaskToBoard(Long boardId, Long taskId) {
         Board board = boardRepository.findById(boardId)
             .orElseThrow(() -> new BoardNotFoundException("Board " + boardId + " not found"));
-
+    
+        Task task = taskRepository.findById(taskId)
+            .orElseThrow(() -> new TaskNotFoundException("Task " + taskId + " not found"));
+    
         board.addTask(task);
         return boardRepository.save(board);
     }

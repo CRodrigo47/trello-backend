@@ -58,8 +58,14 @@ public class TaskController {
 
     @PutMapping("/{id}")
     public TaskDto updateTask(@PathVariable Long id, @RequestBody Task task) {
-        task.setId(id);
-        return DtoMapper.toTaskDto(taskService.updateTask(task));
+        Task existingTask = taskService.getTaskById(id)
+                .orElseThrow(() -> new TaskNotFoundException("Task id " + id + " not found."));
+
+        existingTask.setTitle(task.getTitle());
+        existingTask.setDescription(task.getDescription());
+        existingTask.setStatus(task.getStatus());
+
+        return DtoMapper.toTaskDto(taskService.updateTask(existingTask));
     }
 
     @DeleteMapping("/{id}")

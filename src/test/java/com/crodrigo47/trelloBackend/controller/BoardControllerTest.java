@@ -148,7 +148,7 @@ class BoardControllerTest {
 
         saved.addTask(task);
 
-        when(boardService.addTaskToBoard(anyLong(), any(Task.class))).thenReturn(saved);
+        when(boardService.addTaskToBoard(anyLong(), anyLong())).thenReturn(saved);
 
         var expectedDto = BuildersDto.buildBoardDtoWithId("TestBoard", 1L);
         expectedDto.taskIds().add(task.getId());

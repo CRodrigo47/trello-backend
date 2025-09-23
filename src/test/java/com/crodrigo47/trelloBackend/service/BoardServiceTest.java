@@ -23,6 +23,7 @@ import com.crodrigo47.trelloBackend.model.Board;
 import com.crodrigo47.trelloBackend.model.Task;
 import com.crodrigo47.trelloBackend.model.User;
 import com.crodrigo47.trelloBackend.repository.BoardRepository;
+import com.crodrigo47.trelloBackend.repository.TaskRepository;
 import com.crodrigo47.trelloBackend.repository.UserRepository;
 
 @ExtendWith(MockitoExtension.class)
@@ -36,6 +37,9 @@ class BoardServiceTest {
 
     @Mock
     TaskService taskService;
+
+    @Mock
+    TaskRepository taskRepository;
 
     @InjectMocks
     BoardService boardService;
@@ -100,8 +104,9 @@ class BoardServiceTest {
 
         when(boardRepository.findById(1L)).thenReturn(Optional.of(board));
         when(boardRepository.save(any(Board.class))).thenReturn(board);
+        when(taskRepository.findById(10L)).thenReturn(Optional.of(task));
 
-        var result = boardService.addTaskToBoard(1L, task);
+        var result = boardService.addTaskToBoard(1L, 10L);
 
         assertThat(result.getTasks()).contains(task);
     }
@@ -110,7 +115,7 @@ class BoardServiceTest {
     void addTaskToBoard_notFound_throwException() {
         when(boardRepository.findById(1L)).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> boardService.addTaskToBoard(1L, new Task()))
+        assertThatThrownBy(() -> boardService.addTaskToBoard(1L, new Task().getId()))
                 .isInstanceOf(BoardNotFoundException.class);
     }
 
