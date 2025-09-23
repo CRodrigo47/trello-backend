@@ -72,4 +72,26 @@ class AuthControllerTest {
                 .andExpect(jsonPath("$.id").value(99))
                 .andExpect(jsonPath("$.token").isNotEmpty());
     }
+
+    //-------------------------------ERROR TEST----------------------------------------//
+
+    @Test
+    void login_invalidPassword_returns401() throws Exception {
+        String rawPassword = "correctpassword";
+        String wrongPassword = "wrongpassword";
+        String encodedPassword = passwordEncoder.encode(rawPassword);
+    
+        when(userRepository.findByUsername("dave"))
+                .thenReturn(Optional.of(User.builder()
+                        .id(1L)
+                        .username("dave")
+                        .password(encodedPassword)
+                        .build()));
+    
+        mockMvc.perform(post("/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"username\": \"dave\", \"password\": \"" + wrongPassword + "\"}"))
+                .andExpect(status().isUnauthorized());
+    }
+
 }

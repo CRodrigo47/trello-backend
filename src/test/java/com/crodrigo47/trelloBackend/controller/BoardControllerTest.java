@@ -213,5 +213,32 @@ class BoardControllerTest {
             .andExpect(jsonPath("$[1].id").value(expectedUser2.id()))
             .andExpect(jsonPath("$[1].username").value(expectedUser2.username()));
     }
-        
+       
+    //-------------------------------ERROR TEST----------------------------------------//
+
+    @Test
+    void getBoardById_notFound_returns404() throws Exception {
+        when(boardService.getBoardById(1L)).thenReturn(Optional.empty());
+
+        mockMvc.perform(get("/boards/1"))
+            .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void getTasksFromBoard_notFound_returns404() throws Exception {
+        when(boardService.getTasksFromBoard(1L)).thenThrow(new com.crodrigo47.trelloBackend.exception.BoardNotFoundException("Board not found."));
+
+        mockMvc.perform(get("/boards/1/tasks"))
+            .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void getUsersFromBoard_notFound_returns404() throws Exception {
+        when(boardService.getUsersFromBoard(1L)).thenThrow(new com.crodrigo47.trelloBackend.exception.BoardNotFoundException("Board not found."));
+
+        mockMvc.perform(get("/boards/1/users"))
+            .andExpect(status().isNotFound());
+    }
+
+
 }

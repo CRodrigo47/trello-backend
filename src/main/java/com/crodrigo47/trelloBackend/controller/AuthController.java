@@ -46,7 +46,7 @@ public class AuthController {
                 });
             
         if (!passwordEncoder.matches(requestUser.getPassword(), user.getPassword())) {
-            throw new RuntimeException("Invalid password");
+            throw new com.crodrigo47.trelloBackend.exception.InvalidPasswordException("Invalid password");
         }
     
         Key key = Keys.hmacShaKeyFor(jwtSecret.getBytes());

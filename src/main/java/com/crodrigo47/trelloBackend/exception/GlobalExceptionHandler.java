@@ -27,5 +27,9 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(404).body(body);
     }
 
-    // Puedes añadir handlers para otras excepciones (BadRequest, Unauthorized, etc.)
+    @ExceptionHandler(InvalidPasswordException.class)
+    public ResponseEntity<ErrorResponse> handleInvalidPassword(InvalidPasswordException ex){
+        ErrorResponse body = new ErrorResponse(401, "Auth Required", ex.getMessage(), Instant.now());
+        return ResponseEntity.status(401).body(body);
+    }
 }

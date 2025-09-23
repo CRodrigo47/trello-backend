@@ -187,4 +187,31 @@ class TaskControllerTest {
             .andExpect(jsonPath("$[0].id").value(expectedDto.id()))
             .andExpect(jsonPath("$[0].title").value(expectedDto.title()));
     }
+
+    //-------------------------------ERROR TEST----------------------------------------//
+
+    @Test
+    void getTaskById_notFound_returns404() throws Exception {
+        when(taskService.getTaskById(1L)).thenReturn(Optional.empty());
+
+        mockMvc.perform(get("/tasks/1"))
+            .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void assignUser_userNotFound_returns404() throws Exception {
+        when(userService.getUserById(10L)).thenReturn(Optional.empty());
+
+        mockMvc.perform(post("/tasks/1/users/10"))
+            .andExpect(status().isNotFound());
+    }
+
+    @Test
+    void getUserAssigned_taskNotFound_returns404() throws Exception {
+        when(taskService.getTaskById(1L)).thenReturn(Optional.empty());
+
+        mockMvc.perform(get("/tasks/1/users"))
+            .andExpect(status().isNotFound());
+    }
+
 }

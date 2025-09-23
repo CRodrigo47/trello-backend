@@ -94,4 +94,14 @@ class UserControllerTest {
 
         verify(userService).deleteUser(userId);
     }
+
+    //-------------------------------ERROR TEST----------------------------------------//
+
+    @Test
+    void getUserById_notFound_returns404() throws Exception {
+        when(userService.getUserById(1L)).thenReturn(Optional.empty());
+
+        mockMvc.perform(get("/users/1"))
+            .andExpect(status().isNotFound());
+    }
 }
