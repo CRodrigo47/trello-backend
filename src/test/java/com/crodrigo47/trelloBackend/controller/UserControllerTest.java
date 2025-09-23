@@ -11,9 +11,11 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -25,6 +27,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @WebMvcTest(UserController.class)
 @AutoConfigureMockMvc(addFilters = false)
 class UserControllerTest {
+
+    @MockBean BCryptPasswordEncoder passwordEncoder;
 
     @Autowired MockMvc mockMvc;
     @Autowired ObjectMapper mapper;
@@ -72,17 +76,32 @@ class UserControllerTest {
 
     @Test
     void updateUser_returnsUpdatedUser() throws Exception {
-        User updated = Builders.buildUserWithId("bob", 1L);
-        when(userService.updateUser(any(User.class))).thenReturn(updated);
+        Map<String, String> body = Map.of(
+            "username", "bobUpdated",
+            "email", "bob@mail.com",
+            "currentPassword", "bob"
+        );
 
-        var expectedDto = BuildersDto.buildUserDtoWithId("bob", 1L);
+        // Usuario existente con username = "bob"
+        User existingUser = Builders.buildUserWithId("bob", 1L);
+        existingUser.setPassword(new BCryptPasswordEncoder().encode("bob"));
 
-        mockMvc.perform(put("/users/" + updated.getId())
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(mapper.writeValueAsString(updated)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value(expectedDto.id()))
-                .andExpect(jsonPath("$.username").value(expectedDto.username()));
+        // Usuario actualizado
+        User updatedUser = Builders.buildUserWithId("bobUpdated", 1L);
+
+        when(userService.getUserById(1L)).thenReturn(Optional.of(existingUser));
+        when(passwordEncoder.matches("bob", existingUser.getPassword())).thenReturn(true);
+        when(userService.updateUser(any(User.class))).thenReturn(updatedUser);
+
+        var expectedDto = BuildersDto.buildUserDtoWithId("bobUpdated", 1L);
+
+    mockMvc.perform(put("/users/1")
+            .principal(() -> "bob") // aquí simulas el usernameFromToken
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(mapper.writeValueAsString(body)))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.id").value(expectedDto.id()))
+            .andExpect(jsonPath("$.username").value(expectedDto.username()));
     }
 
     @Test
@@ -104,4 +123,26 @@ class UserControllerTest {
         mockMvc.perform(get("/users/1"))
             .andExpect(status().isNotFound());
     }
+
+    @Test
+    void updateUser_wrongCurrentPassword_throwsInvalidPassword() throws Exception {
+        Map<String, String> body = Map.of(
+            "username", "bobUpdated",
+            "currentPassword", "wrongPassword",
+            "newPassword", "newSecret"
+        );
+    
+        User existingUser = Builders.buildUserWithId("bob", 1L);
+        existingUser.setPassword(new BCryptPasswordEncoder().encode("bob"));
+    
+        when(userService.getUserById(1L)).thenReturn(Optional.of(existingUser));
+        when(passwordEncoder.matches("wrongPassword", existingUser.getPassword())).thenReturn(false);
+    
+        mockMvc.perform(put("/users/1")
+                .principal(() -> "bob")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(mapper.writeValueAsString(body)))
+                .andExpect(status().is4xxClientError());
+    }
+
 }

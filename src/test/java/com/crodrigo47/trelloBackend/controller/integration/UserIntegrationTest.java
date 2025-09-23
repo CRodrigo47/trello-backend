@@ -2,7 +2,6 @@ package com.crodrigo47.trelloBackend.controller.integration;
 
 import com.crodrigo47.trelloBackend.helper.Builders;
 import com.crodrigo47.trelloBackend.model.User;
-import com.crodrigo47.trelloBackend.repository.UserRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -10,6 +9,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -29,7 +29,7 @@ class UserIntegrationTest {
 
     @Autowired MockMvc mockMvc;
     @Autowired ObjectMapper mapper;
-    @Autowired UserRepository userRepository;
+    @Autowired com.crodrigo47.trelloBackend.repository.UserRepository userRepository;
 
     @BeforeEach
     void setup() {
@@ -38,38 +38,44 @@ class UserIntegrationTest {
 
     @Test
     void userFullFlow_crud() throws Exception {
-        // ----------------- CREATE -----------------
-        String userName = "alice";
-        String updatedUserName = "aliceUpdated";
+        String username = "alice";
+        String updatedUsername = "aliceUpdated";
 
-        User user = Builders.buildUser(userName);
-        String createResponse = mockMvc.perform(post("/users")
+        // ----------------- CREATE -----------------
+        User user = Builders.buildUser(username);
+        String createResp = mockMvc.perform(post("/users")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(mapper.writeValueAsString(user)))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
 
-        Map<String, Object> userJson = mapper.readValue(createResponse, new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {});
+        @SuppressWarnings("unchecked")
+        Map<String, Object> userJson = mapper.readValue(createResp, Map.class);
         Long userId = Long.valueOf((Integer) userJson.get("id"));
-        assertThat(userJson.get("username")).isEqualTo(userName);
+        assertThat(userJson.get("username")).isEqualTo(username);
 
         // ----------------- UPDATE -----------------
-        userJson.put("username", updatedUserName);
-        userJson.put("password", "dummyPassword");
-        String updateResponse = mockMvc.perform(put("/users/" + userId)
+        Map<String, String> updateBody = Map.of(
+            "username", updatedUsername,
+            "currentPassword", username // coincidir con la password original
+        );
+
+        String updateResp = mockMvc.perform(put("/users/" + userId)
+                        .principal(new UsernamePasswordAuthenticationToken(username, null))
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(mapper.writeValueAsString(userJson)))
+                        .content(mapper.writeValueAsString(updateBody)))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
 
-        Map<String, Object> updatedUserJson = mapper.readValue(updateResponse, new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {});
-        assertThat(updatedUserJson.get("username")).isEqualTo(updatedUserName);
+        @SuppressWarnings("unchecked")
+        Map<String, Object> updatedUserJson = mapper.readValue(updateResp, Map.class);
+        assertThat(updatedUserJson.get("username")).isEqualTo(updatedUsername);
 
         // ----------------- GET -----------------
         mockMvc.perform(get("/users/" + userId))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(userId))
-                .andExpect(jsonPath("$.username").value(updatedUserName));
+                .andExpect(jsonPath("$.username").value(updatedUsername));
 
         // ----------------- LIST -----------------
         mockMvc.perform(get("/users"))
@@ -79,6 +85,7 @@ class UserIntegrationTest {
         // ----------------- DELETE -----------------
         mockMvc.perform(delete("/users/" + userId))
                 .andExpect(status().isOk());
+
         assertThat(userRepository.findById(userId)).isEmpty();
     }
 }
