@@ -1,5 +1,7 @@
 package com.crodrigo47.trelloBackend.controller;
 
+import com.crodrigo47.trelloBackend.dto.DtoMapper;
+import com.crodrigo47.trelloBackend.dto.UserDto;
 import com.crodrigo47.trelloBackend.model.User;
 import com.crodrigo47.trelloBackend.repository.UserRepository;
 import io.jsonwebtoken.Jwts;
@@ -33,7 +35,7 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    public User login(@RequestBody User requestUser) {
+    public UserDto login(@RequestBody User requestUser) {
         User user = userRepository.findByUsername(requestUser.getUsername())
                 .orElseGet(() -> {
                     User newUser = User.builder()
@@ -42,21 +44,22 @@ public class AuthController {
                             .build();
                     return userRepository.save(newUser);
                 });
-
+            
         if (!passwordEncoder.matches(requestUser.getPassword(), user.getPassword())) {
             throw new RuntimeException("Invalid password");
         }
-
+    
         Key key = Keys.hmacShaKeyFor(jwtSecret.getBytes());
-
+    
         String token = Jwts.builder()
                 .setSubject(user.getUsername())
                 .setIssuedAt(new Date())
                 .setExpiration(new Date(System.currentTimeMillis() + jwtExpirationMs))
                 .signWith(key, SignatureAlgorithm.HS256)
                 .compact();
-
+    
         user.setToken(token);
-        return user;
+        return DtoMapper.toUserDto(user);
     }
+
 }

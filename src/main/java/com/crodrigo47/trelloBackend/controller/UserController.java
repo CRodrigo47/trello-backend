@@ -3,6 +3,9 @@ package com.crodrigo47.trelloBackend.controller;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.crodrigo47.trelloBackend.dto.DtoMapper;
+import com.crodrigo47.trelloBackend.dto.UserDto;
+import com.crodrigo47.trelloBackend.exception.UserNotFoundException;
 import com.crodrigo47.trelloBackend.model.User;
 import com.crodrigo47.trelloBackend.service.UserService;
 
@@ -29,25 +32,28 @@ public class UserController {
     }
 
     @GetMapping
-    public List<User> getAllUsers() {
-        return userService.getAllUsers();
+    public List<UserDto> getAllUsers() {
+        return userService.getAllUsers().stream()
+            .map(DtoMapper::toUserDto)
+            .toList();
     }
-
+    
     @GetMapping("/{id}")
-    public User getUserById(@PathVariable Long id) {
+    public UserDto getUserById(@PathVariable Long id) {
         return userService.getUserById(id)
-                .orElseThrow(() -> new com.crodrigo47.trelloBackend.exception.UserNotFoundException("User id " + id + " not found"));
+            .map(DtoMapper::toUserDto)
+            .orElseThrow(() -> new UserNotFoundException("User id " + id + " not found"));
     }
-
+    
     @PostMapping
-    public User createUser(@RequestBody User user) {
-        return userService.createUser(user);
+    public UserDto createUser(@RequestBody User user) {
+        return DtoMapper.toUserDto(userService.createUser(user));
     }
-
+    
     @PutMapping("/{id}")
-    public User updateUser(@PathVariable Long id, @RequestBody User user) {
+    public UserDto updateUser(@PathVariable Long id, @RequestBody User user) {
         user.setId(id);
-        return userService.updateUser(user);
+        return DtoMapper.toUserDto(userService.updateUser(user));
     }
     
     @DeleteMapping("/{id}")

@@ -29,8 +29,8 @@ public class Builders {
             return Board.builder()
                 .name(name)
                 .description("Descripción de " + name)
-                .users(new HashSet<>())   // vacío por defecto
-                .tasks(new HashSet<>())   // vacío por defecto
+                .users(new HashSet<>())
+                .tasks(new HashSet<>())
                 .build();
     }
 
@@ -39,8 +39,8 @@ public class Builders {
                 .name(name)
                 .id(id)
                 .description("Descripción de " + name)
-                .users(new HashSet<>())   // vacío por defecto
-                .tasks(new HashSet<>())   // vacío por defecto
+                .users(new HashSet<>())
+                .tasks(new HashSet<>())
                 .build();
     }
 

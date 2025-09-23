@@ -3,6 +3,7 @@ package com.crodrigo47.trelloBackend.model;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.util.HashSet;
 import java.util.Set;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
@@ -29,7 +30,8 @@ public class Board {
         inverseJoinColumns = @JoinColumn(name = "user_id")
     )
     @JsonIgnore
-    private Set<User> users;
+    @Builder.Default
+    private Set<User> users = new HashSet<>();
 
     public void addUser(User u){
         users.add(u);
@@ -43,7 +45,8 @@ public class Board {
 
     @OneToMany(mappedBy = "board", cascade = CascadeType.ALL, orphanRemoval = true)
     @JsonIgnore
-    private Set<Task> tasks;
+    @Builder.Default
+    private Set<Task> tasks = new HashSet<>();
 
     public void addTask(Task t){
         tasks.add(t);

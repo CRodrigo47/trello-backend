@@ -3,6 +3,11 @@ package com.crodrigo47.trelloBackend.controller;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.crodrigo47.trelloBackend.dto.DtoMapper;
+import com.crodrigo47.trelloBackend.dto.TaskDto;
+import com.crodrigo47.trelloBackend.dto.UserDto;
+import com.crodrigo47.trelloBackend.exception.TaskNotFoundException;
+import com.crodrigo47.trelloBackend.exception.UserNotFoundException;
 import com.crodrigo47.trelloBackend.model.Task;
 import com.crodrigo47.trelloBackend.model.User;
 import com.crodrigo47.trelloBackend.service.TaskService;
@@ -33,25 +38,28 @@ public class TaskController {
     }
 
     @GetMapping
-    public List<Task> getAllTasks(){
-        return taskService.getAllTasks();
+    public List<TaskDto> getAllTasks(){
+        return taskService.getAllTasks().stream()
+            .map(DtoMapper::toTaskDto)
+            .toList();
     }
 
     @GetMapping("/{id}")
-    public Task getTaskById(@PathVariable Long id) {
+    public TaskDto getTaskById(@PathVariable Long id) {
         return taskService.getTaskById(id)
-        .orElseThrow(() -> new com.crodrigo47.trelloBackend.exception.TaskNotFoundException("Task id " + id + " not found."));
+            .map(DtoMapper::toTaskDto)
+            .orElseThrow(() -> new TaskNotFoundException("Task id " + id + " not found."));
     }
-    
+
     @PostMapping
-    public Task createTask(@RequestBody Task task) {
-        return taskService.createTask(task);
+    public TaskDto createTask(@RequestBody Task task) {
+        return DtoMapper.toTaskDto(taskService.createTask(task));
     }
-    
+
     @PutMapping("/{id}")
-    public Task updateTask(@PathVariable Long id, @RequestBody Task task) {
+    public TaskDto updateTask(@PathVariable Long id, @RequestBody Task task) {
         task.setId(id);
-        return taskService.updateTask(task);
+        return DtoMapper.toTaskDto(taskService.updateTask(task));
     }
 
     @DeleteMapping("/{id}")
@@ -60,37 +68,46 @@ public class TaskController {
     }
     
     @PostMapping("/{taskId}/users/{userId}")
-    public Task assignUser(@PathVariable Long taskId, @PathVariable Long userId) {
+    public TaskDto assignUser(@PathVariable Long taskId, @PathVariable Long userId) {
         User user = userService.getUserById(userId)
-            .orElseThrow(() -> new com.crodrigo47.trelloBackend.exception.UserNotFoundException("User " + userId + " not found."));
-        return taskService.assignTaskToUser(taskId, user);
+                .orElseThrow(() -> new UserNotFoundException("User " + userId + " not found."));
+        return DtoMapper.toTaskDto(taskService.assignTaskToUser(taskId, user));
     }
-
+    
     @DeleteMapping("/{taskId}/users")
-    public Task unassignUser(@PathVariable Long taskId) {
-        return taskService.unassignTaskFromUser(taskId);
+    public TaskDto unassignUser(@PathVariable Long taskId) {
+        return DtoMapper.toTaskDto(taskService.unassignTaskFromUser(taskId));
     }
-
+    
     @GetMapping("/{taskId}/users")
-    public User getUserAssigned(@PathVariable Long taskId){
+    public UserDto getUserAssigned(@PathVariable Long taskId) {
         Task task = taskService.getTaskById(taskId)
-            .orElseThrow(() -> new com.crodrigo47.trelloBackend.exception.TaskNotFoundException("Task " + taskId + " not found"));
-        
-        return task.getAssignedTo();
+                .orElseThrow(() -> new TaskNotFoundException("Task " + taskId + " not found"));
+        return DtoMapper.toUserDto(task.getAssignedTo());
     }
-
+    
     @GetMapping("/board/{boardId}")
-    public List<Task> getTasksByBoard(@PathVariable Long boardId) {
-        return taskService.getTasksByBoard(boardId);
+    public List<TaskDto> getTasksByBoard(@PathVariable Long boardId) {
+        return taskService.getTasksByBoard(boardId)
+                .stream()
+                .map(DtoMapper::toTaskDto)
+                .toList();
     }
-
+    
     @GetMapping("/user/{userId}")
-    public List<Task> getTasksByUser(@PathVariable Long userId) {
-        return taskService.getTasksByUser(userId);
+    public List<TaskDto> getTasksByUser(@PathVariable Long userId) {
+        return taskService.getTasksByUser(userId)
+                .stream()
+                .map(DtoMapper::toTaskDto)
+                .toList();
+    }
+    
+    @GetMapping("/status/{status}")
+    public List<TaskDto> getTasksByStatus(@PathVariable Task.Status status) {
+        return taskService.getTasksByStatus(status)
+                .stream()
+                .map(DtoMapper::toTaskDto)
+                .toList();
     }
 
-    @GetMapping("/status/{status}")
-    public List<Task> getTasksByStatus(@PathVariable Task.Status status) {
-        return taskService.getTasksByStatus(status);
-    }
 }

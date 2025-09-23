@@ -3,6 +3,7 @@ package com.crodrigo47.trelloBackend.model;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.util.HashSet;
 import java.util.Set;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
@@ -32,7 +33,8 @@ public class User {
 
     @ManyToMany(mappedBy = "users")
     @JsonIgnore
-    private Set<Board> boards;
+    @Builder.Default
+    private Set<Board> boards = new HashSet<>();;
 
     public void addBoard(Board b){
         boards.add(b);
@@ -46,7 +48,8 @@ public class User {
     
     @OneToMany(mappedBy = "assignedTo")
     @JsonIgnore
-    private Set<Task> tasks;
+    @Builder.Default
+    private Set<Task> tasks = new HashSet<>();
 
     public void addTask(Task t){
         tasks.add(t);
