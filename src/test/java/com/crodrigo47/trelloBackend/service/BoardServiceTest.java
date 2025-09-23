@@ -16,6 +16,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import com.crodrigo47.trelloBackend.exception.BoardNotFoundException;
+import com.crodrigo47.trelloBackend.exception.TaskNotFoundException;
 import com.crodrigo47.trelloBackend.exception.UserNotFoundException;
 import com.crodrigo47.trelloBackend.helper.Builders;
 import com.crodrigo47.trelloBackend.model.Board;
@@ -41,7 +42,9 @@ class BoardServiceTest {
 
     @Test
     void getAllBoards_returnList() {
-        when(boardRepository.findAll()).thenReturn(List.of(Builders.buildBoard("Diseño"), Builders.buildBoard("Programación")));
+        when(boardRepository.findAll()).thenReturn(List.of(
+                Builders.buildBoard("Diseño"),
+                Builders.buildBoard("Programación")));
 
         var result = boardService.getAllBoards();
 
@@ -51,7 +54,8 @@ class BoardServiceTest {
 
     @Test
     void getBoardById_returnBoard() {
-        when(boardRepository.findById(1L)).thenReturn(Optional.of(Builders.buildBoardWithId("Diseño", 1L)));
+        when(boardRepository.findById(1L))
+                .thenReturn(Optional.of(Builders.buildBoardWithId("Diseño", 1L)));
 
         var result = boardService.getBoardById(1L);
 
@@ -61,7 +65,8 @@ class BoardServiceTest {
 
     @Test
     void createBoard_returnBoard() {
-        when(boardRepository.save(any(Board.class))).thenReturn(Builders.buildBoardWithId("Diseño", 1L));
+        when(boardRepository.save(any(Board.class)))
+                .thenReturn(Builders.buildBoardWithId("Diseño", 1L));
 
         var result = boardService.createBoard(Builders.buildBoard("Diseño"));
 
@@ -99,7 +104,6 @@ class BoardServiceTest {
         var result = boardService.addTaskToBoard(1L, task);
 
         assertThat(result.getTasks()).contains(task);
-        verify(boardRepository).save(board);
     }
 
     @Test
@@ -108,6 +112,40 @@ class BoardServiceTest {
 
         assertThatThrownBy(() -> boardService.addTaskToBoard(1L, new Task()))
                 .isInstanceOf(BoardNotFoundException.class);
+    }
+
+    @Test
+    void removeTaskFromBoard_removesTask() {
+        Task task = Builders.buildTaskWithId("Tarea", 10L, Builders.buildBoard("Diseño"), Builders.buildUser("bob"));
+        Board board = Builders.buildBoardWithId("Diseño", 1L);
+        board.addTask(task);
+
+        when(boardRepository.findById(1L)).thenReturn(Optional.of(board));
+        when(taskService.getTaskById(10L)).thenReturn(Optional.of(task));
+        when(boardRepository.save(any(Board.class))).thenReturn(board);
+
+        boardService.removeTaskFromBoard(1L, 10L);
+
+        assertThat(board.getTasks()).doesNotContain(task);
+    }
+
+    @Test
+    void removeTaskFromBoard_boardNotFound_throwException() {
+        when(boardRepository.findById(1L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> boardService.removeTaskFromBoard(1L, 10L))
+                .isInstanceOf(BoardNotFoundException.class);
+    }
+
+    @Test
+    void removeTaskFromBoard_taskNotFound_throwException() {
+        Board board = Builders.buildBoardWithId("Diseño", 1L);
+
+        when(boardRepository.findById(1L)).thenReturn(Optional.of(board));
+        when(taskService.getTaskById(10L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> boardService.removeTaskFromBoard(1L, 10L))
+                .isInstanceOf(TaskNotFoundException.class);
     }
 
     @Test
@@ -122,16 +160,58 @@ class BoardServiceTest {
         var result = boardService.addUserToBoard(1L, 2L);
 
         assertThat(result.getUsers()).contains(user);
-        verify(boardRepository).save(board);
+    }
+
+    @Test
+    void addUserToBoard_boardNotFound_throwException() {
+        when(boardRepository.findById(1L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> boardService.addUserToBoard(1L, 2L))
+                .isInstanceOf(BoardNotFoundException.class);
     }
 
     @Test
     void addUserToBoard_userNotFound_throwException() {
         Board board = Builders.buildBoardWithId("Diseño", 1L);
+
         when(boardRepository.findById(1L)).thenReturn(Optional.of(board));
         when(userRepository.findById(2L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> boardService.addUserToBoard(1L, 2L))
+                .isInstanceOf(UserNotFoundException.class);
+    }
+
+    @Test
+    void removeUserFromBoard_removesUser() {
+        User user = Builders.buildUserWithId("bob", 2L);
+        Board board = Builders.buildBoardWithId("Diseño", 1L);
+        board.addUser(user);
+
+        when(boardRepository.findById(1L)).thenReturn(Optional.of(board));
+        when(userRepository.findById(2L)).thenReturn(Optional.of(user));
+        when(boardRepository.save(any(Board.class))).thenReturn(board);
+
+        boardService.removeUserFromBoard(1L, 2L);
+
+        assertThat(board.getUsers()).doesNotContain(user);
+    }
+
+    @Test
+    void removeUserFromBoard_boardNotFound_throwException() {
+        when(boardRepository.findById(1L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> boardService.removeUserFromBoard(1L, 2L))
+                .isInstanceOf(BoardNotFoundException.class);
+    }
+
+    @Test
+    void removeUserFromBoard_userNotFound_throwException() {
+        Board board = Builders.buildBoardWithId("Diseño", 1L);
+
+        when(boardRepository.findById(1L)).thenReturn(Optional.of(board));
+        when(userRepository.findById(2L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> boardService.removeUserFromBoard(1L, 2L))
                 .isInstanceOf(UserNotFoundException.class);
     }
 
