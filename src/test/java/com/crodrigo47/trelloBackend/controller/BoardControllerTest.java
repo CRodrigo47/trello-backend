@@ -2,15 +2,17 @@ package com.crodrigo47.trelloBackend.controller;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doNothing;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -25,6 +27,8 @@ import com.crodrigo47.trelloBackend.helper.BuildersDto;
 import com.crodrigo47.trelloBackend.model.Board;
 import com.crodrigo47.trelloBackend.model.Task;
 import com.crodrigo47.trelloBackend.model.User;
+import com.crodrigo47.trelloBackend.repository.BoardRepository;
+import com.crodrigo47.trelloBackend.repository.UserRepository;
 import com.crodrigo47.trelloBackend.service.BoardService;
 import com.crodrigo47.trelloBackend.service.TaskService;
 import com.crodrigo47.trelloBackend.service.UserService;
@@ -40,13 +44,16 @@ class BoardControllerTest {
     @MockBean BoardService boardService;
     @MockBean UserService userService;
     @MockBean TaskService taskService;
+    @MockBean BoardRepository boardRepository;
+    @MockBean UserRepository userRepository;
 
     @Test
     void getAllBoards_returnsJsonList() throws Exception {
-        Board board = Builders.buildBoardWithId("MockBoard", 1L);
+        User creator = Builders.buildUserWithId("bob", 10L);
+        Board board = Builders.buildBoardWithId("MockBoard", 1L, creator);
         when(boardService.getAllBoards()).thenReturn(List.of(board));
 
-        var expectedDto = BuildersDto.buildBoardDtoWithId("MockBoard", 1L);
+        var expectedDto = BuildersDto.buildBoardDtoWithId("MockBoard", 1L, creator.getId());
 
         mockMvc.perform(get("/boards"))
             .andExpect(status().isOk())
@@ -56,10 +63,11 @@ class BoardControllerTest {
 
     @Test
     void getBoardById_returnsBoard() throws Exception {
-        Board board = Builders.buildBoardWithId("MockBoard", 1L);
+        User creator = Builders.buildUserWithId("bob", 10L);
+        Board board = Builders.buildBoardWithId("MockBoard", 1L, creator);
         when(boardService.getBoardById(1L)).thenReturn(Optional.of(board));
 
-        var expectedDto = BuildersDto.buildBoardDtoWithId("MockBoard", 1L);
+        var expectedDto = BuildersDto.buildBoardDtoWithId("MockBoard", 1L, creator.getId());
 
         mockMvc.perform(get("/boards/1"))
             .andExpect(status().isOk())
@@ -69,11 +77,12 @@ class BoardControllerTest {
 
     @Test
     void createBoard_returnsCreatedBoard() throws Exception {
-        Board inputBoard = Builders.buildBoard("TestBoard");
-        Board saved = Builders.buildBoardWithId("TestBoard", 1L);
-        when(boardService.createBoard(any(Board.class))).thenReturn(saved);
+        User creator = Builders.buildUserWithId("bob", 10L);
+        Board inputBoard = Builders.buildBoard("TestBoard", creator);
+        Board saved = Builders.buildBoardWithId("TestBoard", 1L, creator);
+        when(boardService.createBoard(any(Board.class), any())).thenReturn(saved);
 
-        var expectedDto = BuildersDto.buildBoardDtoWithId("TestBoard", 1L);
+        var expectedDto = BuildersDto.buildBoardDtoWithId("TestBoard", 1L, creator.getId());
 
         mockMvc.perform(post("/boards")
             .contentType(MediaType.APPLICATION_JSON)
@@ -83,41 +92,60 @@ class BoardControllerTest {
             .andExpect(jsonPath("$.name").value(expectedDto.name()));
     }
 
-    @Test
-    void updateBoard_returnsUpdatedBoard() throws Exception {
-        Board updated = Builders.buildBoardWithId("TestBoard", 1L);
-        when(boardService.updateBoard(any(Board.class))).thenReturn(updated);
+@Test
+void updateBoard_returnsUpdatedBoard_whenCreatedByMatches() throws Exception {
+    User creator = Builders.buildUserWithId("bob", 10L);
+    Board updated = Builders.buildBoardWithId("UpdatedBoard", 1L, creator);
 
-        var expectedDto = BuildersDto.buildBoardDtoWithId("TestBoard", 1L);
+    // 👇 hace falta este mock
+    when(userRepository.findById(creator.getId())).thenReturn(Optional.of(creator));
 
-        mockMvc.perform(put("/boards/" + updated.getId())
+    when(boardService.updateBoard(any(Board.class), eq(creator.getId())))
+        .thenReturn(updated);
+
+    var expectedDto = BuildersDto.buildBoardDtoWithId("UpdatedBoard", 1L, creator.getId());
+
+    mockMvc.perform(put("/boards/" + updated.getId())
+            .param("userId", creator.getId().toString())
             .contentType(MediaType.APPLICATION_JSON)
             .content(mapper.writeValueAsString(updated)))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.id").value(expectedDto.id()))
-            .andExpect(jsonPath("$.name").value(expectedDto.name()));
-    }
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.id").value(expectedDto.id()))
+        .andExpect(jsonPath("$.name").value(expectedDto.name()));
 
-    @Test
-    void deleteBoard_callsService() throws Exception {
-        Long boardId = 1L;
+    verify(boardService).updateBoard(any(Board.class), eq(creator.getId()));
+}
 
-        mockMvc.perform(delete("/boards/" + boardId))
-            .andExpect(status().isOk());
 
-        verify(boardService).deleteBoard(boardId);
-    }
+@Test
+void deleteBoard_callsService_whenCreatedByMatches() throws Exception {
+    User creator = Builders.buildUserWithId("bob", 10L);
+    Long boardId = 1L;
+
+    // 👇 hace falta este mock
+    when(userRepository.findById(creator.getId())).thenReturn(Optional.of(creator));
+
+    doNothing().when(boardService).deleteBoard(boardId, creator.getId());
+
+    mockMvc.perform(delete("/boards/" + boardId)
+            .param("userId", creator.getId().toString()))
+        .andExpect(status().isOk());
+
+    verify(boardService).deleteBoard(boardId, creator.getId());
+}
+
 
     @Test
     void addUserToBoard_returnsBoard() throws Exception {
-        Board saved = Builders.buildBoardWithId("TestBoard", 1L);
         User user = Builders.buildUserWithId("bob", 10L);
+        Board saved = Builders.buildBoardWithId("TestBoard", 1L, user);
+        
 
         saved.addUser(user);
 
         when(boardService.addUserToBoard(anyLong(), anyLong())).thenReturn(saved);
 
-        var expectedDto = BuildersDto.buildBoardDtoWithId("TestBoard", 1L);
+        var expectedDto = BuildersDto.buildBoardDtoWithId("TestBoard", 1L, user.getId());
         expectedDto.userIds().add(user.getId());
 
         mockMvc.perform(post("/boards/" + saved.getId() + "/users/" + user.getId())
@@ -142,15 +170,15 @@ class BoardControllerTest {
 
     @Test
     void addTaskToBoard_returnsBoard() throws Exception {
-        Board saved = Builders.buildBoardWithId("TestBoard", 1L);
         User user = Builders.buildUserWithId("bob", 10L);
+        Board saved = Builders.buildBoardWithId("TestBoard", 1L, user);
         Task task = Builders.buildTaskWithId("TestTask", 100L, saved, user);
 
         saved.addTask(task);
 
         when(boardService.addTaskToBoard(anyLong(), anyLong())).thenReturn(saved);
 
-        var expectedDto = BuildersDto.buildBoardDtoWithId("TestBoard", 1L);
+        var expectedDto = BuildersDto.buildBoardDtoWithId("TestBoard", 1L, user.getId());
         expectedDto.taskIds().add(task.getId());
 
         mockMvc.perform(post("/boards/" + saved.getId() + "/tasks")
@@ -175,8 +203,10 @@ class BoardControllerTest {
 
     @Test
     void getTaskFromBoard_returnsTaskList() throws Exception {
-        Board board = Builders.buildBoardWithId("TestBoard", 1L);
         User user = Builders.buildUserWithId("bob", 10L);
+
+        Board board = Builders.buildBoardWithId("TestBoard", 1L, user);
+
 
         Task task1 = Builders.buildTaskWithId("Task 1", 100L, board, user);
         Task task2 = Builders.buildTaskWithId("Task 2", 101L, board, user);
@@ -184,7 +214,7 @@ class BoardControllerTest {
         var expectedTask1 = BuildersDto.buildTaskDtoWithId("Task 1", 100L);
         var expectedTask2 = BuildersDto.buildTaskDtoWithId("Task 2", 101L);
 
-        when(boardService.getTasksFromBoard(board.getId())).thenReturn(Set.of(task1, task2));
+        when(boardService.getTasksFromBoard(board.getId())).thenReturn(new LinkedHashSet<>(List.of(task1, task2)));
 
         mockMvc.perform(get("/boards/" + board.getId() + "/tasks"))
             .andExpect(status().isOk())
@@ -204,7 +234,7 @@ class BoardControllerTest {
         var expectedUser1 = BuildersDto.buildUserDtoWithId("alice", 10L);
         var expectedUser2 = BuildersDto.buildUserDtoWithId("bob", 11L);
 
-        when(boardService.getUsersFromBoard(boardId)).thenReturn(Set.of(user1, user2));
+        when(boardService.getUsersFromBoard(boardId)).thenReturn(new LinkedHashSet<>(List.of(user1, user2)));
 
         mockMvc.perform(get("/boards/" + boardId + "/users"))
             .andExpect(status().isOk())

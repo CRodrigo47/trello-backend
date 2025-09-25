@@ -47,20 +47,8 @@ class TaskIntegrationTest {
     @Test
     void taskFullFlow_crudAndRelations() throws Exception {
         // ----------------- SETUP -----------------
-        Board testBoard = boardRepository.save(Builders.buildBoard("BoardTest"));
-
-        // CREATE USER via endpoint
-        User testUser = Builders.buildUser("bob");
-
-        String userResponse = mockMvc.perform(post("/users")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(mapper.writeValueAsString(testUser)))
-                .andExpect(status().isOk())
-                .andReturn().getResponse().getContentAsString();
-
-        Map<String, Object> userJson = mapper.readValue(userResponse, new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {});
-        Long userId = Long.valueOf((Integer) userJson.get("id"));
-        assertThat(userJson.get("username")).isEqualTo("bob");
+        User testCreator = userRepository.save(Builders.buildUser("CreatorTest"));
+        Board testBoard = boardRepository.save(Builders.buildBoard("BoardTest", testCreator));
 
         // ----------------- CREATE TASK -----------------
         Task testTask = Builders.buildTask("TestTask", testBoard, null);
@@ -93,13 +81,13 @@ class TaskIntegrationTest {
                 .andExpect(jsonPath("$.title").value("UpdatedTask"));
 
         // ----------------- ASSIGN USER -----------------
-        String assignResponse = mockMvc.perform(post("/tasks/" + taskId + "/users/" + userId)
+        String assignResponse = mockMvc.perform(post("/tasks/" + taskId + "/users/" + testCreator.getId())
                         .contentType(MediaType.APPLICATION_JSON))
                 .andExpect(status().isOk())
                 .andReturn().getResponse().getContentAsString();
 
         Map<String, Object> assignedTaskJson = mapper.readValue(assignResponse, new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {});
-        assertThat(((Integer) assignedTaskJson.get("assignedToId"))).isEqualTo(userId.intValue());
+        assertThat(((Integer) assignedTaskJson.get("assignedToId"))).isEqualTo(testCreator.getId().intValue());
 
         // ----------------- GET USER ASSIGNED -----------------
         String getUserResp = mockMvc.perform(get("/tasks/" + taskId + "/users")
@@ -108,8 +96,8 @@ class TaskIntegrationTest {
                 .andReturn().getResponse().getContentAsString();
 
         Map<String, Object> userAssigned = mapper.readValue(getUserResp, new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {});
-        assertThat(((Integer) userAssigned.get("id"))).isEqualTo(userId.intValue());
-        assertThat(userAssigned.get("username")).isEqualTo("bob");
+        assertThat(((Integer) userAssigned.get("id"))).isEqualTo(testCreator.getId().intValue());
+        assertThat(userAssigned.get("username")).isEqualTo("CreatorTest");
 
         // ----------------- UNASSIGN USER -----------------
         String unassignResponse = mockMvc.perform(delete("/tasks/" + taskId + "/users"))

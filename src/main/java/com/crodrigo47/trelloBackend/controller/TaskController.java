@@ -1,6 +1,7 @@
 package com.crodrigo47.trelloBackend.controller;
 
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.crodrigo47.trelloBackend.dto.DtoMapper;
@@ -10,11 +11,14 @@ import com.crodrigo47.trelloBackend.exception.TaskNotFoundException;
 import com.crodrigo47.trelloBackend.exception.UserNotFoundException;
 import com.crodrigo47.trelloBackend.model.Task;
 import com.crodrigo47.trelloBackend.model.User;
+import com.crodrigo47.trelloBackend.repository.UserRepository;
 import com.crodrigo47.trelloBackend.service.TaskService;
 import com.crodrigo47.trelloBackend.service.UserService;
 
 import java.util.List;
 
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -23,18 +27,19 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.PutMapping;
 
 
-
-
 @RestController
 @RequestMapping("/tasks")
 public class TaskController {
+
+    private final UserRepository userRepository;
     
     private final UserService userService;
     private final TaskService taskService;
 
-    public TaskController(UserService userService, TaskService taskService) {
+    public TaskController(UserService userService, TaskService taskService, UserRepository userRepository) {
         this.userService = userService;
         this.taskService = taskService;
+        this.userRepository = userRepository;
     }
 
     @GetMapping
@@ -56,22 +61,54 @@ public class TaskController {
         return DtoMapper.toTaskDto(taskService.createTask(task));
     }
 
-    @PutMapping("/{id}")
-    public TaskDto updateTask(@PathVariable Long id, @RequestBody Task task) {
-        Task existingTask = taskService.getTaskById(id)
-                .orElseThrow(() -> new TaskNotFoundException("Task id " + id + " not found."));
+@SuppressWarnings("null")
+@PutMapping("/{id}")
+public TaskDto updateTask(@PathVariable Long id,
+                          @RequestBody Task task,
+                          @AuthenticationPrincipal User user,
+                          @RequestParam(required = false) Long userId) {
 
-        existingTask.setTitle(task.getTitle());
-        existingTask.setDescription(task.getDescription());
-        existingTask.setStatus(task.getStatus());
-
-        return DtoMapper.toTaskDto(taskService.updateTask(existingTask));
+    if (user == null && userId != null) {
+        user = userRepository.findById(userId)
+                .orElseThrow(() -> new UserNotFoundException("User " + userId + " not found"));
     }
 
-    @DeleteMapping("/{id}")
-    public void deleteTask(@PathVariable Long id){
-        taskService.deleteTask(id);
+    Task existingTask = taskService.getTaskById(id)
+            .orElseThrow(() -> new TaskNotFoundException("Task id " + id + " not found."));
+
+    // Opcional: comprobar que el usuario es el asignado
+    if (existingTask.getAssignedTo() != null && !existingTask.getAssignedTo().getId().equals(user.getId())) {
+        throw new AccessDeniedException("Only the assigned user can update this task");
     }
+
+    existingTask.setTitle(task.getTitle());
+    existingTask.setDescription(task.getDescription());
+    existingTask.setStatus(task.getStatus());
+
+    return DtoMapper.toTaskDto(taskService.updateTask(existingTask));
+}
+
+@SuppressWarnings("null")
+@DeleteMapping("/{id}")
+public void deleteTask(@PathVariable Long id,
+                       @AuthenticationPrincipal User user,
+                       @RequestParam(required = false) Long userId) {
+
+    if (user == null && userId != null) {
+        user = userRepository.findById(userId)
+                .orElseThrow(() -> new UserNotFoundException("User " + userId + " not found"));
+    }
+
+    Task existingTask = taskService.getTaskById(id)
+            .orElseThrow(() -> new TaskNotFoundException("Task id " + id + " not found."));
+
+    // Opcional: comprobar que el usuario es el asignado
+    if (existingTask.getAssignedTo() != null && !existingTask.getAssignedTo().getId().equals(user.getId())) {
+        throw new AccessDeniedException("Only the assigned user can delete this task");
+    }
+
+    taskService.deleteTask(id);
+}
     
     @PostMapping("/{taskId}/users/{userId}")
     public TaskDto assignUser(@PathVariable Long taskId, @PathVariable Long userId) {

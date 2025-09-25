@@ -11,6 +11,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
 import org.springframework.http.MediaType;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -58,23 +59,6 @@ class UserControllerTest {
     }
 
     @Test
-    void createUser_returnsCreatedUser() throws Exception {
-        User inputUser = Builders.buildUser("charlie");
-        User savedUser = Builders.buildUserWithId("charlie", 2L);
-
-        when(userService.createUser(any(User.class))).thenReturn(savedUser);
-
-        var expectedDto = BuildersDto.buildUserDtoWithId("charlie", 2L);
-
-        mockMvc.perform(post("/users")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(mapper.writeValueAsString(inputUser)))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value(expectedDto.id()))
-                .andExpect(jsonPath("$.username").value(expectedDto.username()));
-    }
-
-    @Test
     void updateUser_returnsUpdatedUser() throws Exception {
         Map<String, String> body = Map.of(
             "username", "bobUpdated",
@@ -105,12 +89,24 @@ class UserControllerTest {
     }
 
     @Test
-    void deleteUser_callsService() throws Exception {
+    void deleteUser_deletesOwnAccount() throws Exception {
         Long userId = 1L;
-
-        mockMvc.perform(delete("/users/" + userId))
+        User existingUser = Builders.buildUserWithId("bob", userId);
+    
+        when(userService.getUserById(userId)).thenReturn(Optional.of(existingUser));
+    
+        var userDetails = org.springframework.security.core.userdetails.User
+                .withUsername("bob")
+                .password("pass")
+                .roles("USER")
+                .build();
+    
+        var auth = new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
+    
+        mockMvc.perform(delete("/users/{id}", userId)
+                .principal(auth)) // pasamos un Authentication real
             .andExpect(status().isOk());
-
+    
         verify(userService).deleteUser(userId);
     }
 

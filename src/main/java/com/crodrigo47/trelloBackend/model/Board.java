@@ -23,6 +23,11 @@ public class Board {
     private String name;
     private String description;
 
+    @ManyToOne
+    @JoinColumn(name = "created_by_id")
+    private User createdBy;
+
+
     @ManyToMany
     @JoinTable(
         name = "board_user",

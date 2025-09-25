@@ -14,7 +14,8 @@ public class DtoMapper {
             board.getName(),
             board.getDescription(),
             board.getUsers().stream().map(User::getId).collect(Collectors.toSet()),
-            board.getTasks().stream().map(Task::getId).collect(Collectors.toSet())
+            board.getTasks().stream().map(Task::getId).collect(Collectors.toSet()),
+            board.getCreatedBy() != null ? board.getCreatedBy().getId() : null
         );
     }
 

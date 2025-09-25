@@ -46,9 +46,10 @@ class BoardServiceTest {
 
     @Test
     void getAllBoards_returnList() {
+        User creator = Builders.buildUser("bob");
         when(boardRepository.findAll()).thenReturn(List.of(
-                Builders.buildBoard("Diseño"),
-                Builders.buildBoard("Programación")));
+                Builders.buildBoard("Diseño", creator),
+                Builders.buildBoard("Programación", creator)));
 
         var result = boardService.getAllBoards();
 
@@ -58,8 +59,9 @@ class BoardServiceTest {
 
     @Test
     void getBoardById_returnBoard() {
+        User creator = Builders.buildUser("bob");
         when(boardRepository.findById(1L))
-                .thenReturn(Optional.of(Builders.buildBoardWithId("Diseño", 1L)));
+                .thenReturn(Optional.of(Builders.buildBoardWithId("Diseño", 1L, creator)));
 
         var result = boardService.getBoardById(1L);
 
@@ -69,10 +71,11 @@ class BoardServiceTest {
 
     @Test
     void createBoard_returnBoard() {
+        User creator = Builders.buildUser("bob");
         when(boardRepository.save(any(Board.class)))
-                .thenReturn(Builders.buildBoardWithId("Diseño", 1L));
+                .thenReturn(Builders.buildBoardWithId("Diseño", 1L, creator));
 
-        var result = boardService.createBoard(Builders.buildBoard("Diseño"));
+        var result = boardService.createBoard(Builders.buildBoard("Diseño", creator), creator);
 
         assertThat(result.getId()).isEqualTo(1L);
         assertThat(result.getName()).isEqualTo("Diseño");
@@ -80,11 +83,13 @@ class BoardServiceTest {
 
     @Test
     void updateBoard_returnBoard() {
-        Board boardToSave = Builders.buildBoardWithId("Programación", 2L);
+        User creator = Builders.buildUserWithId("alice", 2L);
+        Board boardToSave = Builders.buildBoardWithId("Programación", 2L, creator);
 
+        when(boardRepository.findById(2L)).thenReturn(Optional.of(boardToSave));
         when(boardRepository.save(any(Board.class))).thenReturn(boardToSave);
 
-        var result = boardService.updateBoard(boardToSave);
+        var result = boardService.updateBoard(boardToSave, creator.getId());
 
         assertThat(result.getId()).isEqualTo(2L);
         assertThat(result.getName()).isEqualTo("Programación");
@@ -92,15 +97,21 @@ class BoardServiceTest {
 
     @Test
     void deleteBoard_callsRepository() {
-        boardService.deleteBoard(5L);
+        User creator = Builders.buildUserWithId("alice", 2L);
+        Board board = Builders.buildBoardWithId("Board", 5L, creator);
 
-        verify(boardRepository).deleteById(5L);
+        when(boardRepository.findById(5L)).thenReturn(Optional.of(board));
+
+        boardService.deleteBoard(5L, creator.getId());
+
+        verify(boardRepository).delete(board);
     }
 
     @Test
     void addTaskToBoard_returnBoardWithTask() {
-        Board board = Builders.buildBoardWithId("Diseño", 1L);
-        Task task = Builders.buildTaskWithId("Tarea", 10L, board, Builders.buildUser("bob"));
+        User user = Builders.buildUser("bob");
+        Board board = Builders.buildBoardWithId("Diseño", 1L, user);
+        Task task = Builders.buildTaskWithId("Tarea", 10L, board, user);
 
         when(boardRepository.findById(1L)).thenReturn(Optional.of(board));
         when(boardRepository.save(any(Board.class))).thenReturn(board);
@@ -121,8 +132,9 @@ class BoardServiceTest {
 
     @Test
     void removeTaskFromBoard_removesTask() {
-        Task task = Builders.buildTaskWithId("Tarea", 10L, Builders.buildBoard("Diseño"), Builders.buildUser("bob"));
-        Board board = Builders.buildBoardWithId("Diseño", 1L);
+        User user = Builders.buildUser("bob");
+        Board board = Builders.buildBoardWithId("Diseño", 1L, user);
+        Task task = Builders.buildTaskWithId("Tarea", 10L, board, user);
         board.addTask(task);
 
         when(boardRepository.findById(1L)).thenReturn(Optional.of(board));
@@ -144,7 +156,8 @@ class BoardServiceTest {
 
     @Test
     void removeTaskFromBoard_taskNotFound_throwException() {
-        Board board = Builders.buildBoardWithId("Diseño", 1L);
+        User user = Builders.buildUser("bob");
+        Board board = Builders.buildBoardWithId("Diseño", 1L, user);
 
         when(boardRepository.findById(1L)).thenReturn(Optional.of(board));
         when(taskService.getTaskById(10L)).thenReturn(Optional.empty());
@@ -155,8 +168,9 @@ class BoardServiceTest {
 
     @Test
     void addUserToBoard_returnBoardWithUser() {
-        Board board = Builders.buildBoardWithId("Programación", 1L);
+        User creator = Builders.buildUser("bob");
         User user = Builders.buildUserWithId("alice", 2L);
+        Board board = Builders.buildBoardWithId("Programación", 1L, creator);
 
         when(boardRepository.findById(1L)).thenReturn(Optional.of(board));
         when(userRepository.findById(2L)).thenReturn(Optional.of(user));
@@ -177,7 +191,8 @@ class BoardServiceTest {
 
     @Test
     void addUserToBoard_userNotFound_throwException() {
-        Board board = Builders.buildBoardWithId("Diseño", 1L);
+        User creator = Builders.buildUser("bob");
+        Board board = Builders.buildBoardWithId("Diseño", 1L, creator);
 
         when(boardRepository.findById(1L)).thenReturn(Optional.of(board));
         when(userRepository.findById(2L)).thenReturn(Optional.empty());
@@ -188,8 +203,9 @@ class BoardServiceTest {
 
     @Test
     void removeUserFromBoard_removesUser() {
-        User user = Builders.buildUserWithId("bob", 2L);
-        Board board = Builders.buildBoardWithId("Diseño", 1L);
+        User creator = Builders.buildUser("bob");
+        User user = Builders.buildUserWithId("alice", 2L);
+        Board board = Builders.buildBoardWithId("Diseño", 1L, creator);
         board.addUser(user);
 
         when(boardRepository.findById(1L)).thenReturn(Optional.of(board));
@@ -211,7 +227,8 @@ class BoardServiceTest {
 
     @Test
     void removeUserFromBoard_userNotFound_throwException() {
-        Board board = Builders.buildBoardWithId("Diseño", 1L);
+        User creator = Builders.buildUser("bob");
+        Board board = Builders.buildBoardWithId("Diseño", 1L, creator);
 
         when(boardRepository.findById(1L)).thenReturn(Optional.of(board));
         when(userRepository.findById(2L)).thenReturn(Optional.empty());
@@ -222,8 +239,9 @@ class BoardServiceTest {
 
     @Test
     void getTasksFromBoard_returnTasks() {
-        Task task = Builders.buildTaskWithId("Tarea", 3L, Builders.buildBoard("Diseño"), Builders.buildUser("bob"));
-        Board board = Builders.buildBoardWithId("Diseño", 1L);
+        User user = Builders.buildUser("bob");
+        Board board = Builders.buildBoardWithId("Diseño", 1L, user);
+        Task task = Builders.buildTaskWithId("Tarea", 3L, board, user);
         board.addTask(task);
 
         when(boardRepository.findById(1L)).thenReturn(Optional.of(board));
@@ -235,8 +253,9 @@ class BoardServiceTest {
 
     @Test
     void getUsersFromBoard_returnUsers() {
+        User creator = Builders.buildUser("bob");
         User user = Builders.buildUserWithId("alice", 2L);
-        Board board = Builders.buildBoardWithId("Diseño", 1L);
+        Board board = Builders.buildBoardWithId("Diseño", 1L, creator);
         board.addUser(user);
 
         when(boardRepository.findById(1L)).thenReturn(Optional.of(board));

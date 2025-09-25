@@ -29,50 +29,63 @@ class BoardRepositoryTest {
     
     @Test
     void createEntity_generatedIdValue(){
-        Board board = boardRepository.save(Builders.buildBoard("Diseño"));
-
+        User creator = userRepository.save(Builders.buildUser("alice"));
+        Board board = boardRepository.save(Builders.buildBoard("Diseño", creator));
+    
         assertThat(board.getId()).isNotNull();
+        assertThat(board.getCreatedBy()).isNotNull(); // nuevo
+        assertThat(board.getCreatedBy().getUsername()).isEqualTo("alice");
     }
-
+    
+    
     @Test
     void findByName_returnsMatchingBoards() {
-
-    boardRepository.save(Builders.buildBoard("Diseño"));
-    boardRepository.save(Builders.buildBoard("Diseño"));
-    boardRepository.save(Builders.buildBoard("Programación"));
-
-    List<Board> result = boardRepository.findByName("Diseño");
-    List<Board> resultEmpty = boardRepository.findByName("Marketing");
-
-    assertThat(resultEmpty).isEmpty();
-    assertThat(result).hasSize(2);
-    assertThat(result)
-        .extracting(Board::getName)
-        .containsOnly("Diseño");
-}
-
-
+        User creator = userRepository.save(Builders.buildUser("alice"));
+    
+        boardRepository.save(Builders.buildBoard("Diseño", creator));
+        boardRepository.save(Builders.buildBoard("Diseño", creator));
+        boardRepository.save(Builders.buildBoard("Programación", creator));
+    
+        List<Board> result = boardRepository.findByName("Diseño");
+        List<Board> resultEmpty = boardRepository.findByName("Marketing");
+    
+        assertThat(resultEmpty).isEmpty();
+        assertThat(result).hasSize(2);
+        assertThat(result)
+            .extracting(Board::getName)
+            .containsOnly("Diseño");
+    
+        assertThat(result)
+            .extracting(Board::getCreatedBy)
+            .allMatch(u -> u.getUsername().equals("alice")); // nuevo
+    }
+    
+    
+    
     @Transactional
     @Test
     void lazy_or_eager_loading(){
-        Board board = boardRepository.save(Builders.buildBoard("Diseño"));
+        User creator = userRepository.save(Builders.buildUser("alice"));
+        Board board = boardRepository.save(Builders.buildBoard("Diseño", creator));
         User user = userRepository.save(Builders.buildUser("bob"));
-        
+    
         taskRepository.save(Builders.buildTask("Tarea1", board, user));
-
+    
         Board loaded = boardRepository.findById(board.getId()).get();
-
+    
         assertThat(loaded.getTasks()).isEmpty(); // depende de fetch type
-
+        assertThat(loaded.getCreatedBy()).isNotNull(); // nuevo
+        assertThat(loaded.getCreatedBy().getUsername()).isEqualTo("alice");
+    
         boardRepository.save(board);
-
+    
         assertThat(loaded.getTasks()).isEmpty();
-
+    
         Task task = taskRepository.save(Builders.buildTask("Tarea2", board, user));
-
+    
         board.addTask(task);
-
+    
         assertThat(loaded.getTasks()).isNotEmpty(); //No es necesario guardar al añadir
-
     }
+
 }

@@ -36,56 +36,49 @@ class UserIntegrationTest {
         userRepository.deleteAll();
     }
 
-    @Test
-    void userFullFlow_crud() throws Exception {
-        String username = "alice";
-        String updatedUsername = "aliceUpdated";
+        @Test
+        void userFullFlow_crud_withoutCreate() throws Exception {
+            String username = "alice";
+            String updatedUsername = "aliceUpdated";
 
-        // ----------------- CREATE -----------------
-        User user = Builders.buildUser(username);
-        String createResp = mockMvc.perform(post("/users")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(mapper.writeValueAsString(user)))
-                .andExpect(status().isOk())
-                .andReturn().getResponse().getContentAsString();
+            // ----------------- SETUP: CREAR USUARIO DIRECTAMENTE -----------------
+            User user = Builders.buildUser(username);
+            user = userRepository.save(user); // guardamos en DB directamente
+            Long userId = user.getId();
 
-        @SuppressWarnings("unchecked")
-        Map<String, Object> userJson = mapper.readValue(createResp, Map.class);
-        Long userId = Long.valueOf((Integer) userJson.get("id"));
-        assertThat(userJson.get("username")).isEqualTo(username);
+            // ----------------- UPDATE -----------------
+            Map<String, String> updateBody = Map.of(
+                "username", updatedUsername,
+                "currentPassword", username // coincidir con la password original
+            );
 
-        // ----------------- UPDATE -----------------
-        Map<String, String> updateBody = Map.of(
-            "username", updatedUsername,
-            "currentPassword", username // coincidir con la password original
-        );
+            String updateResp = mockMvc.perform(put("/users/" + userId)
+                            .principal(new UsernamePasswordAuthenticationToken(username, null))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(mapper.writeValueAsString(updateBody)))
+                    .andExpect(status().isOk())
+                    .andReturn().getResponse().getContentAsString();
 
-        String updateResp = mockMvc.perform(put("/users/" + userId)
-                        .principal(new UsernamePasswordAuthenticationToken(username, null))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(mapper.writeValueAsString(updateBody)))
-                .andExpect(status().isOk())
-                .andReturn().getResponse().getContentAsString();
+            @SuppressWarnings("unchecked")
+            Map<String, Object> updatedUserJson = mapper.readValue(updateResp, Map.class);
+            assertThat(updatedUserJson.get("username")).isEqualTo(updatedUsername);
 
-        @SuppressWarnings("unchecked")
-        Map<String, Object> updatedUserJson = mapper.readValue(updateResp, Map.class);
-        assertThat(updatedUserJson.get("username")).isEqualTo(updatedUsername);
+            // ----------------- GET -----------------
+            mockMvc.perform(get("/users/" + userId))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.id").value(userId))
+                    .andExpect(jsonPath("$.username").value(updatedUsername));
 
-        // ----------------- GET -----------------
-        mockMvc.perform(get("/users/" + userId))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value(userId))
-                .andExpect(jsonPath("$.username").value(updatedUsername));
+            // ----------------- LIST -----------------
+            mockMvc.perform(get("/users"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$[0].id").value(userId));
 
-        // ----------------- LIST -----------------
-        mockMvc.perform(get("/users"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].id").value(userId));
+            // ----------------- DELETE -----------------
+            mockMvc.perform(delete("/users/" + userId)
+                    .principal(new UsernamePasswordAuthenticationToken(updatedUsername, null)))
+                    .andExpect(status().isOk());
 
-        // ----------------- DELETE -----------------
-        mockMvc.perform(delete("/users/" + userId))
-                .andExpect(status().isOk());
-
-        assertThat(userRepository.findById(userId)).isEmpty();
-    }
+            assertThat(userRepository.findById(userId)).isEmpty();
+   }
 }

@@ -33,8 +33,8 @@ class TaskServiceTest {
     @Test
     void getAllTasks_returnList() {
         when(taskRepository.findAll()).thenReturn(List.of(
-                Builders.buildTask("tarea 1", Builders.buildBoard("Diseño"), Builders.buildUser("bob")),
-                Builders.buildTask("tarea 2", Builders.buildBoard("Programación"), Builders.buildUser("alice"))));
+                Builders.buildTask("tarea 1", Builders.buildBoard("Diseño", Builders.buildUser("bob")), Builders.buildUser("bob")),
+                Builders.buildTask("tarea 2", Builders.buildBoard("Programación", Builders.buildUser("bob")), Builders.buildUser("alice"))));
 
         var result = taskService.getAllTasks();
 
@@ -45,7 +45,7 @@ class TaskServiceTest {
     @Test
     void getTaskById_returnTask() {
         when(taskRepository.findById(2L)).thenReturn(Optional.of(
-                Builders.buildTaskWithId("tarea 3", 3L, Builders.buildBoard("Comunicación"), Builders.buildUser("charlie"))));
+                Builders.buildTaskWithId("tarea 3", 3L, Builders.buildBoard("Comunicación", Builders.buildUser("bob")), Builders.buildUser("charlie"))));
 
         var result = taskService.getTaskById(2L);
 
@@ -55,7 +55,7 @@ class TaskServiceTest {
 
     @Test
     void createTask_returnTask() {
-        Task taskToSave = Builders.buildTask("tarea 1", Builders.buildBoard("Diseño"), Builders.buildUser("bob"));
+        Task taskToSave = Builders.buildTask("tarea 1", Builders.buildBoard("Diseño", Builders.buildUser("bob")), Builders.buildUser("bob"));
 
         when(taskRepository.save(any(Task.class))).thenAnswer(invocation -> {
             Task arg = invocation.getArgument(0);
@@ -74,7 +74,7 @@ class TaskServiceTest {
 
     @Test
     void updateTask_returnTask() {
-        Task taskToSave = Builders.buildTaskWithId("tarea 2", 1L, Builders.buildBoardWithId("Diseño", 5L),
+        Task taskToSave = Builders.buildTaskWithId("tarea 2", 1L, Builders.buildBoardWithId("Diseño", 5L, Builders.buildUser("bob")),
                 Builders.buildUserWithId("bob", 10L));
 
         when(taskRepository.save(any(Task.class))).thenAnswer(invocation -> {
@@ -93,7 +93,7 @@ class TaskServiceTest {
 
     @Test
     void assignTaskToUser_returnTask() {
-        Task task = Builders.buildTaskWithId("tarea", 1L, Builders.buildBoard("Diseño"), Builders.buildUser("bob"));
+        Task task = Builders.buildTaskWithId("tarea", 1L, Builders.buildBoard("Diseño", Builders.buildUser("bob")), Builders.buildUser("bob"));
         User user = Builders.buildUserWithId("alice", 2L);
 
         when(taskRepository.findById(1L)).thenReturn(Optional.of(task));
@@ -114,7 +114,7 @@ class TaskServiceTest {
 
     @Test
     void unassignTaskFromUser_returnTask() {
-        Task task = Builders.buildTaskWithId("tarea", 1L, Builders.buildBoard("Diseño"), Builders.buildUser("bob"));
+        Task task = Builders.buildTaskWithId("tarea", 1L, Builders.buildBoard("Diseño", Builders.buildUser("bob")), Builders.buildUser("bob"));
 
         when(taskRepository.findById(1L)).thenReturn(Optional.of(task));
         when(taskRepository.save(any(Task.class))).thenReturn(task);
@@ -126,7 +126,7 @@ class TaskServiceTest {
 
     @Test
     void getTasksByBoard_returnList() {
-        when(taskRepository.findByBoardId(1L)).thenReturn(List.of(Builders.buildTask("tarea", Builders.buildBoard("Diseño"), Builders.buildUser("bob"))));
+        when(taskRepository.findByBoardId(1L)).thenReturn(List.of(Builders.buildTask("tarea", Builders.buildBoard("Diseño", Builders.buildUser("bob")), Builders.buildUser("bob"))));
 
         var result = taskService.getTasksByBoard(1L);
 

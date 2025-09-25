@@ -25,20 +25,22 @@ public class Builders {
                .build();
     }
 
-    public static Board buildBoard(String name) {
+    public static Board buildBoard(String name, User createdBy) {
             return Board.builder()
                 .name(name)
                 .description("Descripción de " + name)
+                .createdBy(createdBy)
                 .users(new HashSet<>())
                 .tasks(new HashSet<>())
                 .build();
     }
 
-        public static Board buildBoardWithId(String name, Long id) {
+        public static Board buildBoardWithId(String name, Long id, User createdBy) {
             return Board.builder()
                 .name(name)
                 .id(id)
                 .description("Descripción de " + name)
+                .createdBy(createdBy)
                 .users(new HashSet<>())
                 .tasks(new HashSet<>())
                 .build();

@@ -30,23 +30,25 @@ public class BuildersDto {
         );
     }
 
-    public static BoardDtoTest buildBoardDto(String name) {
+    public static BoardDtoTest buildBoardDto(String name, Long createdById) {
         return new BoardDtoTest(
             null,
             name,
             "Descripción de " + name,
             new HashSet<>(), // userIds
-            new HashSet<>()  // taskIds
+            new HashSet<>(),  // taskIds
+            createdById
         );
     }
 
-    public static BoardDtoTest buildBoardDtoWithId(String name, Long id) {
+    public static BoardDtoTest buildBoardDtoWithId(String name, Long id, Long createdById) {
         return new BoardDtoTest(
             id,
             name,
             "Descripción de " + name,
             new HashSet<>(), // userIds
-            new HashSet<>()  // taskIds
+            new HashSet<>(),  // taskIds
+            createdById
         );
     }
 

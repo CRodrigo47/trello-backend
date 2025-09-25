@@ -41,17 +41,44 @@ public class BoardService {
         return boardRepository.findById(id);
     }
 
-    public Board createBoard(Board board){
+    public Board createBoard(Board board, User creator){
+        board.setCreatedBy(creator);
+        board.addUser(creator);
         return boardRepository.save(board);
     }
 
-    public Board updateBoard(Board board){
-        return boardRepository.save(board);
+
+    public Board updateBoard(Board board, Long userId){
+        Board existing = boardRepository.findById(board.getId())
+                .orElseThrow(() -> new BoardNotFoundException("Board " + board.getId() + " not found"));
+
+        if(!existing.getCreatedBy().getId().equals(userId)){
+            throw new RuntimeException("Only the creator can update this board");
+        }
+
+        existing.setName(board.getName());
+        existing.setDescription(board.getDescription());
+        return boardRepository.save(existing);
     }
 
-    public void deleteBoard(Long id){
-        boardRepository.deleteById(id);
+    public void deleteBoard(Long boardId, Long userId){
+        Board existing = boardRepository.findById(boardId)
+                .orElseThrow(() -> new BoardNotFoundException("Board " + boardId + " not found"));
+
+        if(!existing.getCreatedBy().getId().equals(userId)){
+            throw new RuntimeException("Only the creator can delete this board");
+        }
+
+        boardRepository.delete(existing);
     }
+
+    public List<Board> getAllBoardsForUser(Long userId) {
+    return boardRepository.findAll()
+        .stream()
+        .filter(board -> board.getCreatedBy().getId().equals(userId) 
+                      || board.getUsers().stream().anyMatch(u -> u.getId().equals(userId)))
+        .toList();
+}
 
     @Transactional
     public Board addTaskToBoard(Long boardId, Long taskId) {

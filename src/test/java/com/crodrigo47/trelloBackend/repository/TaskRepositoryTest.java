@@ -29,8 +29,8 @@ class TaskRepositoryTest {
 
     @Test
     void createEntity_generatedIdValue() {
-        Board board = boardRepository.save(Builders.buildBoard("Diseño"));
         User user = userRepository.save(Builders.buildUser("paul"));
+        Board board = boardRepository.save(Builders.buildBoard("Diseño", user));
         Task task = taskRepository.save(Builders.buildTask("tarea", board, user));
 
         assertThat(board.getId()).isNotNull();
@@ -40,8 +40,8 @@ class TaskRepositoryTest {
 
     @Test
     void saveTask_withBoardAnduser_persistsCorrectly() {
-        Board board = boardRepository.save(Builders.buildBoard("Diseño"));
         User user = userRepository.save(Builders.buildUser("bob"));
+        Board board = boardRepository.save(Builders.buildBoard("Diseño", user));
 
         Task task = taskRepository.save(Builders.buildTask("Tarea 1", board, user));
 
@@ -52,8 +52,8 @@ class TaskRepositoryTest {
 
     @Test
     void getAllBoards_returnsList(){
-        Board board = boardRepository.save(Builders.buildBoard("Programación"));
         User user = userRepository.save(Builders.buildUser("alice"));
+        Board board = boardRepository.save(Builders.buildBoard("Programación", user));
 
         taskRepository.save(Builders.buildTask("tarea1", board, user));
         taskRepository.save(Builders.buildTask("tarea2", board, user));
@@ -79,8 +79,8 @@ class TaskRepositoryTest {
 
     @Test
     void findByBoardId_returnList(){
-         Board board = boardRepository.save(Builders.buildBoard("Programación"));
-         User user = userRepository.save(Builders.buildUser("alice"));
+        User user = userRepository.save(Builders.buildUser("alice"));
+         Board board = boardRepository.save(Builders.buildBoard("Programación", user));
 
           taskRepository.save(Builders.buildTask("tarea1", board, user));
           taskRepository.save(Builders.buildTask("tarea2", board, user));
@@ -94,8 +94,8 @@ class TaskRepositoryTest {
 
     @Test
     void findByAssignedToId_returnList(){
-          Board board = boardRepository.save(Builders.buildBoard("Programación"));
           User user = userRepository.save(Builders.buildUser("alice"));
+          Board board = boardRepository.save(Builders.buildBoard("Programación", user));
 
           taskRepository.save(Builders.buildTask("tarea1", board, user));
           taskRepository.save(Builders.buildTask("tarea2", board, user));
@@ -109,8 +109,8 @@ class TaskRepositoryTest {
 
     @Test
     void findByAssignedStatus_returnList(){
-         Board board = boardRepository.save(Builders.buildBoard("Programación"));
          User user = userRepository.save(Builders.buildUser("alice"));
+         Board board = boardRepository.save(Builders.buildBoard("Programación", user));
 
           taskRepository.save(Builders.buildTaskWithStatus("tarea1", board, user, Task.Status.DONE));
           taskRepository.save(Builders.buildTaskWithStatus("tarea2", board, user, Task.Status.FUTURE));
@@ -131,8 +131,8 @@ class TaskRepositoryTest {
 
     @Test
     void deleteCascade_returnEmpty(){
-         Board board = boardRepository.save(Builders.buildBoard("Programación"));
          User user = userRepository.save(Builders.buildUser("alice"));
+         Board board = boardRepository.save(Builders.buildBoard("Programación", user));
 
         Task task1 = taskRepository.save(Builders.buildTask("tarea1", board, user));
         Task task2 = taskRepository.save(Builders.buildTask("tarea2", board, user));

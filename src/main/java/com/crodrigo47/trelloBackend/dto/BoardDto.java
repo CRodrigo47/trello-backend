@@ -7,5 +7,6 @@ public record BoardDto(
     String name,
     String description,
     Set<Long> userIds,
-    Set<Long> taskIds
+    Set<Long> taskIds,
+    Long createdById
 ) {}

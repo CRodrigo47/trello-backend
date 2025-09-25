@@ -45,83 +45,93 @@ class BoardIntegrationTest {
         userRepository.deleteAll();
     }
 
-    @Test
-    void boardFullFlow_crudAndRelations() throws Exception {
-        // ----------------- CREATE -----------------
-        String boardName = "IntegrationBoard";
-        String updatedBoardName = "UpdatedBoard";
+@Test
+void boardFullFlow_crudAndRelations() throws Exception {
+    // ----------------- PREPARAR USUARIO -----------------
+    User creator = userRepository.save(Builders.buildUser("bob"));
 
-        String createResponse = mockMvc.perform(post("/boards")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(mapper.writeValueAsString(Map.of("name", boardName))))
-                .andExpect(status().isOk())
-                .andReturn().getResponse().getContentAsString();
+    // ----------------- CREATE -----------------
+    String boardName = "IntegrationBoard";
+    String updatedBoardName = "UpdatedBoard";
 
-        Map<String, Object> boardJson = mapper.readValue(createResponse, new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {});
-        Long boardId = Long.valueOf((Integer) boardJson.get("id"));
-        assertThat(boardJson.get("name")).isEqualTo(boardName);
-        assertThat(boardRepository.findById(boardId)).isPresent();
-
-        // ----------------- UPDATE -----------------
-        boardJson.put("name", updatedBoardName);
-        String updateResponse = mockMvc.perform(put("/boards/" + boardId)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(mapper.writeValueAsString(boardJson)))
-                .andExpect(status().isOk())
-                .andReturn().getResponse().getContentAsString();
-
-        Map<String, Object> updatedBoardJson = mapper.readValue(updateResponse, new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {});
-        assertThat(updatedBoardJson.get("name")).isEqualTo(updatedBoardName);
-
-        // ----------------- ADD USER -----------------
-        User boardUser = userRepository.save(Builders.buildUser("alice"));
-        String addUserResponse = mockMvc.perform(post("/boards/" + boardId + "/users/" + boardUser.getId())
-                .contentType(MediaType.APPLICATION_JSON))
-                .andExpect(status().isOk())
-                .andReturn().getResponse().getContentAsString();
-
-        Map<String, Object> boardWithUserJson = mapper.readValue(addUserResponse, new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {});
-        @SuppressWarnings("unchecked")
-        List<Object> userIds = (List<Object>) boardWithUserJson.get("userIds");
-        assertThat(userIds).contains(boardUser.getId().intValue());
-
-        // ----------------- ADD TASK -----------------
-        Board boardEntity = boardRepository.findById(boardId).orElseThrow();
-        Task boardTask = taskRepository.save(Builders.buildTask("task1", boardEntity, boardUser));
-        String addTaskResponse = mockMvc.perform(post("/boards/" + boardId + "/tasks")
+    String createResponse = mockMvc.perform(post("/boards")
+            .param("userId", creator.getId().toString()) // 👈 Pasamos el usuario
             .contentType(MediaType.APPLICATION_JSON)
-            .content(mapper.writeValueAsString(Map.of("id", boardTask.getId()))))
+            .content(mapper.writeValueAsString(Map.of("name", boardName))))
             .andExpect(status().isOk())
             .andReturn().getResponse().getContentAsString();
 
-        Map<String, Object> boardWithTaskJson = mapper.readValue(addTaskResponse, new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {});
-        @SuppressWarnings("unchecked")
-        List<Object> taskIds = (List<Object>) boardWithTaskJson.get("taskIds");
-        assertThat(taskIds).contains(boardTask.getId().intValue());
+    Map<String, Object> boardJson = mapper.readValue(createResponse, new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {});
+    Long boardId = Long.valueOf((Integer) boardJson.get("id"));
+    assertThat(boardJson.get("name")).isEqualTo(boardName);
+    assertThat(boardRepository.findById(boardId)).isPresent();
 
-        // ----------------- GET TASKS -----------------
-        mockMvc.perform(get("/boards/" + boardId + "/tasks"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].id").value(boardTask.getId()))
-                .andExpect(jsonPath("$[0].title").value(boardTask.getTitle()));
+    // ----------------- UPDATE -----------------
+    boardJson.put("name", updatedBoardName);
+    String updateResponse = mockMvc.perform(put("/boards/" + boardId)
+            .param("userId", creator.getId().toString()) // 👈 Pasamos el usuario
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(mapper.writeValueAsString(boardJson)))
+            .andExpect(status().isOk())
+            .andReturn().getResponse().getContentAsString();
 
-        // ----------------- GET USERS -----------------
-        mockMvc.perform(get("/boards/" + boardId + "/users"))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].id").value(boardUser.getId()))
-                .andExpect(jsonPath("$[0].username").value(boardUser.getUsername()));
+    Map<String, Object> updatedBoardJson = mapper.readValue(updateResponse, new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {});
+    assertThat(updatedBoardJson.get("name")).isEqualTo(updatedBoardName);
 
-        // ----------------- REMOVE USER -----------------
-        mockMvc.perform(delete("/boards/" + boardId + "/users/" + boardUser.getId()))
-                .andExpect(status().isOk());
+    // ----------------- ADD USER -----------------
+    User boardUser = userRepository.save(Builders.buildUser("alice"));
+    String addUserResponse = mockMvc.perform(post("/boards/" + boardId + "/users/" + boardUser.getId())
+            .param("userId", creator.getId().toString()) // 👈 Pasamos el usuario
+            .contentType(MediaType.APPLICATION_JSON))
+            .andExpect(status().isOk())
+            .andReturn().getResponse().getContentAsString();
 
-        // ----------------- REMOVE TASK -----------------
-        mockMvc.perform(delete("/boards/" + boardId + "/tasks/" + boardTask.getId()))
-                .andExpect(status().isOk());
+    Map<String, Object> boardWithUserJson = mapper.readValue(addUserResponse, new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {});
+    @SuppressWarnings("unchecked")
+    List<Object> userIds = (List<Object>) boardWithUserJson.get("userIds");
+    assertThat(userIds).contains(boardUser.getId().intValue());
 
-        // ----------------- DELETE BOARD -----------------
-        mockMvc.perform(delete("/boards/" + boardId))
-                .andExpect(status().isOk());
-        assertThat(boardRepository.findById(boardId)).isEmpty();
-    }
+    // ----------------- ADD TASK -----------------
+    Board boardEntity = boardRepository.findById(boardId).orElseThrow();
+    Task boardTask = taskRepository.save(Builders.buildTask("task1", boardEntity, boardUser));
+    String addTaskResponse = mockMvc.perform(post("/boards/" + boardId + "/tasks")
+        .param("userId", creator.getId().toString()) // 👈 Pasamos el usuario
+        .contentType(MediaType.APPLICATION_JSON)
+        .content(mapper.writeValueAsString(Map.of("id", boardTask.getId()))))
+        .andExpect(status().isOk())
+        .andReturn().getResponse().getContentAsString();
+
+    Map<String, Object> boardWithTaskJson = mapper.readValue(addTaskResponse, new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {});
+    @SuppressWarnings("unchecked")
+    List<Object> taskIds = (List<Object>) boardWithTaskJson.get("taskIds");
+    assertThat(taskIds).contains(boardTask.getId().intValue());
+
+    // ----------------- GET TASKS -----------------
+    mockMvc.perform(get("/boards/" + boardId + "/tasks"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[0].id").value(boardTask.getId()))
+            .andExpect(jsonPath("$[0].title").value(boardTask.getTitle()));
+
+    // ----------------- GET USERS -----------------
+    mockMvc.perform(get("/boards/" + boardId + "/users"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[0].id").value(creator.getId()))
+            .andExpect(jsonPath("$[0].username").value(creator.getUsername()));
+
+    // ----------------- REMOVE USER -----------------
+    mockMvc.perform(delete("/boards/" + boardId + "/users/" + boardUser.getId())
+            .param("userId", creator.getId().toString())) // 👈 Pasamos el usuario
+            .andExpect(status().isOk());
+
+    // ----------------- REMOVE TASK -----------------
+    mockMvc.perform(delete("/boards/" + boardId + "/tasks/" + boardTask.getId())
+            .param("userId", creator.getId().toString())) // 👈 Pasamos el usuario
+            .andExpect(status().isOk());
+
+    // ----------------- DELETE BOARD -----------------
+    mockMvc.perform(delete("/boards/" + boardId)
+            .param("userId", creator.getId().toString())) // 👈 Pasamos el usuario
+            .andExpect(status().isOk());
+    assertThat(boardRepository.findById(boardId)).isEmpty();
+}
 }
