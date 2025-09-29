@@ -1,7 +1,6 @@
 package com.crodrigo47.trelloBackend.service;
 
 import java.util.List;
-import java.util.Optional;
 import java.util.Set;
 
 import org.springframework.stereotype.Service;
@@ -24,21 +23,26 @@ public class BoardService {
     private final BoardRepository boardRepository;
     private final UserRepository userRepository;
     private final TaskRepository taskRepository;
-    private final TaskService taskService;
 
-    public BoardService(BoardRepository boardRepository, TaskService taskService, UserRepository userRepository, TaskRepository taskRepository){
+    public BoardService(BoardRepository boardRepository, UserRepository userRepository, TaskRepository taskRepository){
         this.boardRepository = boardRepository;
-        this.taskService = taskService;
         this.userRepository = userRepository;
         this.taskRepository = taskRepository;
     }
 
-    public List<Board> getAllBoards() {
-        return boardRepository.findAll();
+    public List<Board> getAllBoardsForCurrentUser(User currentUser) {
+        return boardRepository.findByUsersId(currentUser.getId());
     }
 
-    public Optional<Board> getBoardById(Long id){
-        return boardRepository.findById(id);
+    public Board getBoardById(Long id, User currentUser) {
+        Board board = boardRepository.findById(id)
+            .orElseThrow(() -> new BoardNotFoundException("Board not found"));
+        
+        if (!board.getUsers().contains(currentUser) && !board.getCreatedBy().equals(currentUser)) {
+            throw new RuntimeException("Not authorized to access this board");
+        }
+
+        return board;
     }
 
     public Board createBoard(Board board, User creator){
@@ -47,12 +51,10 @@ public class BoardService {
         return boardRepository.save(board);
     }
 
+    public Board updateBoard(Board board, User currentUser){
+        Board existing = getBoardById(board.getId(), currentUser);
 
-    public Board updateBoard(Board board, Long userId){
-        Board existing = boardRepository.findById(board.getId())
-                .orElseThrow(() -> new BoardNotFoundException("Board " + board.getId() + " not found"));
-
-        if(!existing.getCreatedBy().getId().equals(userId)){
+        if(!existing.getCreatedBy().equals(currentUser)){
             throw new RuntimeException("Only the creator can update this board");
         }
 
@@ -61,56 +63,52 @@ public class BoardService {
         return boardRepository.save(existing);
     }
 
-    public void deleteBoard(Long boardId, Long userId){
-        Board existing = boardRepository.findById(boardId)
-                .orElseThrow(() -> new BoardNotFoundException("Board " + boardId + " not found"));
+    public void deleteBoard(Long boardId, User currentUser){
+        Board existing = getBoardById(boardId, currentUser);
 
-        if(!existing.getCreatedBy().getId().equals(userId)){
+        if(!existing.getCreatedBy().equals(currentUser)){
             throw new RuntimeException("Only the creator can delete this board");
         }
 
         boardRepository.delete(existing);
     }
 
-    public List<Board> getAllBoardsForUser(Long userId) {
-    return boardRepository.findAll()
-        .stream()
-        .filter(board -> board.getCreatedBy().getId().equals(userId) 
-                      || board.getUsers().stream().anyMatch(u -> u.getId().equals(userId)))
-        .toList();
-}
-
     @Transactional
-    public Board addTaskToBoard(Long boardId, Long taskId) {
-        Board board = boardRepository.findById(boardId)
-            .orElseThrow(() -> new BoardNotFoundException("Board " + boardId + " not found"));
-    
-        Task task = taskRepository.findById(taskId)
-            .orElseThrow(() -> new TaskNotFoundException("Task " + taskId + " not found"));
-    
+    public Board addTaskToBoard(Long boardId, Task task, User currentUser) {
+        Board board = getBoardById(boardId, currentUser);
+
+        if (!board.getUsers().contains(currentUser)) {
+            throw new RuntimeException("You must be a member to add tasks");
+        }
+
         board.addTask(task);
         return boardRepository.save(board);
     }
 
-    public void removeTaskFromBoard(Long boardId, Long taskId){
-        Board board = boardRepository.findById(boardId)
-            .orElseThrow(() -> new BoardNotFoundException("Board " + boardId + " not found"));
+    public void removeTaskFromBoard(Long boardId, Long taskId, User currentUser){
+        Board board = getBoardById(boardId, currentUser);
 
-        Task task = taskService.getTaskById(taskId)
-            .orElseThrow(() -> new com.crodrigo47.trelloBackend.exception.TaskNotFoundException("Task id " + taskId + " not found"));
+        Task task = taskRepository.findById(taskId)
+            .orElseThrow(() -> new TaskNotFoundException("Task id " + taskId + " not found"));
 
         if (!board.getTasks().contains(task)) {
             throw new RuntimeException("Task not in this board");
         }
 
+        if (!board.getCreatedBy().equals(currentUser) && !task.getCreatedBy().equals(currentUser)) {
+            throw new RuntimeException("Not authorized to remove this task");
+        }
+
         board.removeTask(task);
         boardRepository.save(board);
-        taskService.deleteTask(task.getId());
     }
 
-    public Board addUserToBoard(Long boardId, Long userId) {
-        Board board = boardRepository.findById(boardId)
-            .orElseThrow(() -> new BoardNotFoundException("Board " + boardId + " not found"));
+    public Board addUserToBoard(Long boardId, Long userId, User currentUser) {
+        Board board = getBoardById(boardId, currentUser);
+
+        if (!board.getCreatedBy().equals(currentUser)) {
+            throw new RuntimeException("Only the creator can add users");
+        }
 
         User user = userRepository.findById(userId)
             .orElseThrow(() -> new UserNotFoundException("User " + userId + " not found"));
@@ -119,9 +117,12 @@ public class BoardService {
         return boardRepository.save(board);
     }
 
-    public void removeUserFromBoard(Long boardId, Long userId){
-        Board board = boardRepository.findById(boardId)
-            .orElseThrow(() -> new BoardNotFoundException("Board " + boardId + " not found"));
+    public void removeUserFromBoard(Long boardId, Long userId, User currentUser){
+        Board board = getBoardById(boardId, currentUser);
+
+        if (!board.getCreatedBy().equals(currentUser)) {
+            throw new RuntimeException("Only the creator can remove users");
+        }
 
         User user = userRepository.findById(userId)
             .orElseThrow(() -> new UserNotFoundException("User " + userId + " not found"));
@@ -130,18 +131,18 @@ public class BoardService {
         boardRepository.save(board);
     }
 
-    public Set<Task> getTasksFromBoard(Long boardId) {
-        Board board = boardRepository.findById(boardId)
-            .orElseThrow(() -> new BoardNotFoundException("Board " + boardId + " not found"));
-
+    public Set<Task> getTasksFromBoard(Long boardId, User currentUser) {
+        Board board = getBoardById(boardId, currentUser);
         return board.getTasks();
     }
 
-    public Set<User> getUsersFromBoard(Long boardId) {
-        Board board = boardRepository.findById(boardId)
-            .orElseThrow(() -> new BoardNotFoundException("Board " + boardId + " not found"));
-
+    public Set<User> getUsersFromBoard(Long boardId, User currentUser) {
+        Board board = getBoardById(boardId, currentUser);
         return board.getUsers();
     }
-}
 
+    public List<Board> searchBoardsByName(User currentUser, String name) {
+    return boardRepository.findByUsersIdAndNameContainingIgnoreCase(currentUser.getId(), name);
+    }
+
+}

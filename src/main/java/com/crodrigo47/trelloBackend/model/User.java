@@ -16,6 +16,15 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 @Builder
 @Table(name = "users")
 public class User {
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private Role role;
+
+    public enum Role {
+        USER,
+        ADMIN
+    }
     
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -23,13 +32,9 @@ public class User {
 
     @Column(nullable = false)
     private String password;
-
-    private String token;
     
     @Column(unique = true, nullable = false)
     private String username;
-    
-    private String email;
 
     @ManyToMany(mappedBy = "users")
     @JsonIgnore

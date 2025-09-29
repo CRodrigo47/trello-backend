@@ -7,5 +7,6 @@ import java.util.List;
 
 
 public interface BoardRepository extends JpaRepository<Board, Long> {
-    List<Board> findByName(String name);
+    List<Board> findByUsersId(Long userId);
+    List<Board> findByUsersIdAndNameContainingIgnoreCase(Long userId, String name);
  }

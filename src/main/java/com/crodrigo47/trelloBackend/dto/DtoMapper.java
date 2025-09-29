@@ -23,8 +23,7 @@ public class DtoMapper {
         return new UserDto(
             user.getId(),
             user.getUsername(),
-            user.getEmail(),
-            user.getToken(),
+            user.getRole(),
             user.getBoards().stream().map(Board::getId).collect(Collectors.toSet()),
             user.getTasks().stream().map(Task::getId).collect(Collectors.toSet())
         );
@@ -35,8 +34,9 @@ public class DtoMapper {
             task.getId(),
             task.getTitle(),
             task.getDescription(),
-            task.getStatus() != null ? task.getStatus().name() : null,
+            task.getStatus(),
             task.getAssignedTo() != null ? task.getAssignedTo().getId() : null,
+            task.getCreatedBy() != null ? task.getCreatedBy().getId() : null,
             task.getBoard() != null ? task.getBoard().getId() : null,
             task.getCreatedAt(),
             task.getUpdatedAt()

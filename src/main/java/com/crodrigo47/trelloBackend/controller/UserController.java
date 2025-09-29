@@ -1,7 +1,8 @@
 package com.crodrigo47.trelloBackend.controller;
 
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 
 import com.crodrigo47.trelloBackend.dto.DtoMapper;
 import com.crodrigo47.trelloBackend.dto.UserDto;
@@ -14,21 +15,11 @@ import java.security.Principal;
 import java.util.List;
 import java.util.Map;
 
-import org.springframework.security.access.AccessDeniedException;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.web.bind.annotation.DeleteMapping;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-
-
 @RestController
 @RequestMapping("/users")
 public class UserController {
 
     private final BCryptPasswordEncoder passwordEncoder;
-    
     private final UserService userService;
 
     public UserController(UserService userService, BCryptPasswordEncoder passwordEncoder){
@@ -36,62 +27,74 @@ public class UserController {
         this.passwordEncoder = passwordEncoder;
     }
 
+    // Solo ADMIN puede listar todos
     @GetMapping
-    public List<UserDto> getAllUsers() {
+    public List<UserDto> getAllUsers(Principal principal) {
+        User current = userService.getUserByUsername(principal.getName())
+                .orElseThrow(() -> new UserNotFoundException("Current user not found"));
+
+        if (current.getRole() != User.Role.ADMIN) {
+            throw new AccessDeniedException("Only ADMIN can access all users");
+        }
+
         return userService.getAllUsers().stream()
-            .map(DtoMapper::toUserDto)
-            .toList();
+                .map(DtoMapper::toUserDto)
+                .toList();
     }
-    
+
     @GetMapping("/{id}")
-    public UserDto getUserById(@PathVariable Long id) {
-        return userService.getUserById(id)
-            .map(DtoMapper::toUserDto)
-            .orElseThrow(() -> new UserNotFoundException("User id " + id + " not found"));
+    public UserDto getUserById(@PathVariable Long id, Principal principal) {
+        User current = userService.getUserByUsername(principal.getName())
+                .orElseThrow(() -> new UserNotFoundException("Current user not found"));
+
+        User user = userService.getUserById(id)
+                .orElseThrow(() -> new UserNotFoundException("User id " + id + " not found"));
+
+        if (current.getRole() != User.Role.ADMIN && !current.getId().equals(user.getId())) {
+            throw new AccessDeniedException("You can only see your own profile");
+        }
+
+        return DtoMapper.toUserDto(user);
     }
-    
+
     @PutMapping("/{id}")
     public UserDto updateUser(
             @PathVariable Long id,
             @RequestBody Map<String, String> body,
             Principal principal
     ) {
+        User current = userService.getUserByUsername(principal.getName())
+                .orElseThrow(() -> new UserNotFoundException("Current user not found"));
+
         User user = userService.getUserById(id)
                 .orElseThrow(() -> new UserNotFoundException("User id " + id + " not found"));
 
-        String usernameFromToken = principal.getName();
-
-        if (!user.getUsername().equals(usernameFromToken)) {
-            throw new org.springframework.security.access.AccessDeniedException("You can only update your own profile");
+        if (!current.getId().equals(user.getId())) {
+            throw new AccessDeniedException("You can only update your own profile");
         }
 
         if (body.containsKey("username")) user.setUsername(body.get("username"));
-        if (body.containsKey("email")) user.setEmail(body.get("email"));
 
         if (body.containsKey("newPassword")) {
             String currentPassword = body.get("currentPassword");
             if (currentPassword == null || !passwordEncoder.matches(currentPassword, user.getPassword())) {
                 throw new InvalidPasswordException("Current password is incorrect");
             }
-            user.setPassword(passwordEncoder.encode(body.get("newPassword")));
+            user.setPassword(body.get("newPassword")); // Codificación se hace en service
         }
 
         return DtoMapper.toUserDto(userService.updateUser(user));
     }
 
-    
     @DeleteMapping("/{id}")
     public void deleteUser(@PathVariable Long id, Principal principal) {
-        User user = userService.getUserById(id)
-                .orElseThrow(() -> new UserNotFoundException("User id " + id + " not found"));
-    
-        // Comprobamos que el usuario loggeado sea el mismo que quiere borrar
-        if (!user.getUsername().equals(principal.getName())) {
+        User current = userService.getUserByUsername(principal.getName())
+                .orElseThrow(() -> new UserNotFoundException("Current user not found"));
+
+        if (!current.getId().equals(id)) {
             throw new AccessDeniedException("You can only delete your own account");
         }
-    
+
         userService.deleteUser(id);
     }
-    
-    
 }

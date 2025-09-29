@@ -1,65 +1,48 @@
 package com.crodrigo47.trelloBackend.controller;
 
-import com.crodrigo47.trelloBackend.dto.DtoMapper;
-import com.crodrigo47.trelloBackend.dto.UserDto;
+import com.crodrigo47.trelloBackend.config.JwtUtil;
+import com.crodrigo47.trelloBackend.dto.AuthResponseDto;
+import com.crodrigo47.trelloBackend.exception.InvalidPasswordException;
 import com.crodrigo47.trelloBackend.model.User;
 import com.crodrigo47.trelloBackend.repository.UserRepository;
-import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.SignatureAlgorithm;
-import io.jsonwebtoken.security.Keys;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
-
-import java.security.Key;
-import java.util.Date;
-
 
 @RestController
 @RequestMapping("/auth")
-@Validated
 public class AuthController {
 
     private final UserRepository userRepository;
-    private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
+    private final BCryptPasswordEncoder passwordEncoder;
+    private final JwtUtil jwtUtil;
 
-    @Value("${jwt.secret}")
-    private String jwtSecret;
-
-    @Value("${jwt.expiration-ms}")
-    private long jwtExpirationMs;
-
-    public AuthController(UserRepository userRepository) {
+    public AuthController(UserRepository userRepository,
+                          BCryptPasswordEncoder passwordEncoder,
+                          JwtUtil jwtUtil) {
         this.userRepository = userRepository;
+        this.passwordEncoder = passwordEncoder;
+        this.jwtUtil = jwtUtil;
     }
 
     @PostMapping("/login")
-    public UserDto login(@RequestBody User requestUser) {
+    public AuthResponseDto login(@RequestBody User requestUser) {
         User user = userRepository.findByUsername(requestUser.getUsername())
                 .orElseGet(() -> {
                     User newUser = User.builder()
                             .username(requestUser.getUsername())
                             .password(passwordEncoder.encode(requestUser.getPassword()))
+                            .role(User.Role.USER)
                             .build();
                     return userRepository.save(newUser);
                 });
-            
+
         if (!passwordEncoder.matches(requestUser.getPassword(), user.getPassword())) {
-            throw new com.crodrigo47.trelloBackend.exception.InvalidPasswordException("Invalid password");
+            throw new InvalidPasswordException("Usuario existente o contraseña incorrecta");
         }
-    
-        Key key = Keys.hmacShaKeyFor(jwtSecret.getBytes());
-    
-        String token = Jwts.builder()
-                .setSubject(user.getUsername())
-                .setIssuedAt(new Date())
-                .setExpiration(new Date(System.currentTimeMillis() + jwtExpirationMs))
-                .signWith(key, SignatureAlgorithm.HS256)
-                .compact();
-    
-        user.setToken(token);
-        return DtoMapper.toUserDto(user);
+
+        String token = jwtUtil.generateToken(new com.crodrigo47.trelloBackend.config.CustomUserDetails(user));
+
+        return new AuthResponseDto(user.getId(), user.getUsername(), token);
     }
 
 }

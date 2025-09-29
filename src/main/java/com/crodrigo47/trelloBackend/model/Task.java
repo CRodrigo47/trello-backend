@@ -2,9 +2,7 @@ package com.crodrigo47.trelloBackend.model;
 
 import jakarta.persistence.*;
 import lombok.*;
-
 import java.time.LocalDateTime;
-
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
 @Entity
@@ -29,15 +27,19 @@ public class Task {
     @JoinColumn(name = "assigned_to_id")
     private User assignedTo;
 
+    @ManyToOne
+    @JoinColumn(name = "created_by_id", nullable = false)
+    private User createdBy;
+
     public void assignUser(User u) {
-        this.assignedTo = u;    
-        u.addTask(this);        
+        this.assignedTo = u;
+        u.addTask(this);
     }
 
     public void unassignUser() {
         if (this.assignedTo != null) {
             this.assignedTo.removeTask(this);
-            this.assignedTo = null;           
+            this.assignedTo = null;
         }
     }
 
@@ -64,9 +66,5 @@ public class Task {
     @PreUpdate
     public void onUpdate() {
         this.updatedAt = LocalDateTime.now();
-    }
-
-    public Task orElseThrow(Object object) {
-        throw new UnsupportedOperationException("Unimplemented method 'orElseThrow'");
     }
 }
