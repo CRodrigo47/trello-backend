@@ -1,5 +1,8 @@
 package com.crodrigo47.trelloBackend.controller;
 
+import com.crodrigo47.trelloBackend.config.CustomUserDetailsService;
+import com.crodrigo47.trelloBackend.config.JwtUtil;
+import com.crodrigo47.trelloBackend.exception.InvalidPasswordException;
 import com.crodrigo47.trelloBackend.model.User;
 import com.crodrigo47.trelloBackend.repository.UserRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -8,6 +11,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
+import org.springframework.boot.test.mock.mockito.SpyBean;
 import org.springframework.http.MediaType;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.test.context.TestPropertySource;
@@ -15,6 +19,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.Optional;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -32,8 +37,10 @@ class AuthControllerTest {
     @Autowired ObjectMapper mapper;
 
     @MockBean UserRepository userRepository;
+    @MockBean JwtUtil jwtUtil;
+    @MockBean CustomUserDetailsService customUserDetailsService;
 
-    private final BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
+    @SpyBean BCryptPasswordEncoder passwordEncoder;
 
     @Test
     void login_returnsExistingUser() throws Exception {
@@ -47,12 +54,14 @@ class AuthControllerTest {
                         .password(encodedPassword)
                         .build()));
 
+        when(jwtUtil.generateToken(any())).thenReturn("fake-jwt-token");
+
         mockMvc.perform(post("/auth/login")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"username\": \"dave\", \"password\": \"" + rawPassword + "\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.username").value("dave"))
-                .andExpect(jsonPath("$.token").isNotEmpty());
+                .andExpect(jsonPath("$.token").value("fake-jwt-token"));
     }
 
     @Test
@@ -65,33 +74,37 @@ class AuthControllerTest {
                     return u;
                 });
 
+        when(jwtUtil.generateToken(any())).thenReturn("fake-jwt-token");
+
         mockMvc.perform(post("/auth/login")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"username\": \"eve\", \"password\": \"mypassword\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(99))
-                .andExpect(jsonPath("$.token").isNotEmpty());
+                .andExpect(jsonPath("$.token").value("fake-jwt-token"));
     }
-
-    //-------------------------------ERROR TEST----------------------------------------//
 
     @Test
     void login_invalidPassword_returns401() throws Exception {
         String rawPassword = "correctpassword";
         String wrongPassword = "wrongpassword";
         String encodedPassword = passwordEncoder.encode(rawPassword);
-    
+
         when(userRepository.findByUsername("dave"))
                 .thenReturn(Optional.of(User.builder()
                         .id(1L)
                         .username("dave")
                         .password(encodedPassword)
                         .build()));
-    
+
         mockMvc.perform(post("/auth/login")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"username\": \"dave\", \"password\": \"" + wrongPassword + "\"}"))
-                .andExpect(status().isUnauthorized());
+                .andExpect(status().isUnauthorized())
+                .andExpect(result ->
+                        assertThat(result.getResolvedException())
+                                .isInstanceOf(InvalidPasswordException.class)
+                                .hasMessage("Usuario existente o contraseña incorrecta")
+                );
     }
-
 }

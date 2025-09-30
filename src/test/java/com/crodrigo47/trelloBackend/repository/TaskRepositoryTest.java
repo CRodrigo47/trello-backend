@@ -17,7 +17,7 @@ import com.crodrigo47.trelloBackend.model.User;
 
 @DataJpaTest
 class TaskRepositoryTest {
-    
+
     @Autowired
     private TaskRepository taskRepository;
 
@@ -30,8 +30,12 @@ class TaskRepositoryTest {
     @Test
     void createEntity_generatedIdValue() {
         User user = userRepository.save(Builders.buildUser("paul"));
-        Board board = boardRepository.save(Builders.buildBoard("Diseño", user));
-        Task task = taskRepository.save(Builders.buildTask("tarea", board, user));
+        Board board = Builders.buildBoard("Diseño", user);
+        board.getUsers().add(user);
+        boardRepository.save(board);
+
+        Task task = Builders.buildTask("tarea", board, user, user);
+        taskRepository.save(task);
 
         assertThat(board.getId()).isNotNull();
         assertThat(user.getId()).isNotNull();
@@ -39,11 +43,14 @@ class TaskRepositoryTest {
     }
 
     @Test
-    void saveTask_withBoardAnduser_persistsCorrectly() {
+    void saveTask_withBoardAndUser_persistsCorrectly() {
         User user = userRepository.save(Builders.buildUser("bob"));
-        Board board = boardRepository.save(Builders.buildBoard("Diseño", user));
+        Board board = Builders.buildBoard("Diseño", user);
+        board.getUsers().add(user);
+        boardRepository.save(board);
 
-        Task task = taskRepository.save(Builders.buildTask("Tarea 1", board, user));
+        Task task = Builders.buildTask("Tarea 1", board, user, user);
+        taskRepository.save(task);
 
         assertThat(task.getId()).isNotNull();
         assertThat(task.getBoard().getId()).isEqualTo(board.getId());
@@ -51,18 +58,20 @@ class TaskRepositoryTest {
     }
 
     @Test
-    void getAllBoards_returnsList(){
+    void getAllTasks_returnsList() {
         User user = userRepository.save(Builders.buildUser("alice"));
-        Board board = boardRepository.save(Builders.buildBoard("Programación", user));
+        Board board = Builders.buildBoard("Programación", user);
+        board.getUsers().add(user);
+        boardRepository.save(board);
 
-        taskRepository.save(Builders.buildTask("tarea1", board, user));
-        taskRepository.save(Builders.buildTask("tarea2", board, user));
+        taskRepository.save(Builders.buildTask("tarea1", board, user, user));
+        taskRepository.save(Builders.buildTask("tarea2", board, user, user));
 
         List<Task> result = taskRepository.findAll();
 
-        assertThat(result).hasSize(2);
-        assertThat(result)
-            .extracting(Task::getTitle).containsExactlyInAnyOrder("tarea1", "tarea2");
+        assertThat(result).hasSize(2)
+                .extracting(Task::getTitle)
+                .containsExactlyInAnyOrder("tarea1", "tarea2");
     }
 
     @Test
@@ -72,95 +81,98 @@ class TaskRepositoryTest {
         task.setBoard(null);
         task.setAssignedTo(Builders.buildUser("bob"));
 
-    assertThatThrownBy(() -> {
-        taskRepository.saveAndFlush(task); // 👈 IMPORTANTE: forzar flush
-    }).isInstanceOf(Exception.class);
+        assertThatThrownBy(() -> taskRepository.saveAndFlush(task))
+                .isInstanceOf(Exception.class);
     }
 
     @Test
-    void findByBoardId_returnList(){
+    void findByBoardId_returnsList() {
         User user = userRepository.save(Builders.buildUser("alice"));
-         Board board = boardRepository.save(Builders.buildBoard("Programación", user));
+        Board board = Builders.buildBoard("Programación", user);
+        board.getUsers().add(user);
+        boardRepository.save(board);
 
-          taskRepository.save(Builders.buildTask("tarea1", board, user));
-          taskRepository.save(Builders.buildTask("tarea2", board, user));
+        taskRepository.save(Builders.buildTask("tarea1", board, user, user));
+        taskRepository.save(Builders.buildTask("tarea2", board, user, user));
 
-        List<Task> result = taskRepository.findByBoardId(board.getId());
+        List<Task> result = taskRepository.findByBoardIdAndBoardUsersId(board.getId(), user.getId());
 
-        assertThat(result).hasSize(2);
-        assertThat(result)
-            .extracting(Task::getTitle).containsExactlyInAnyOrder("tarea1", "tarea2");
+        assertThat(result).hasSize(2)
+                .extracting(Task::getTitle)
+                .containsExactlyInAnyOrder("tarea1", "tarea2");
     }
 
     @Test
-    void findByAssignedToId_returnList(){
-          User user = userRepository.save(Builders.buildUser("alice"));
-          Board board = boardRepository.save(Builders.buildBoard("Programación", user));
+    void findByAssignedToId_returnsList() {
+        User user = userRepository.save(Builders.buildUser("alice"));
+        Board board = Builders.buildBoard("Programación", user);
+        board.getUsers().add(user);
+        boardRepository.save(board);
 
-          taskRepository.save(Builders.buildTask("tarea1", board, user));
-          taskRepository.save(Builders.buildTask("tarea2", board, user));
+        taskRepository.save(Builders.buildTask("tarea1", board, user, user));
+        taskRepository.save(Builders.buildTask("tarea2", board, user, user));
 
-        List<Task> result = taskRepository.findByAssignedToId(user.getId());
+        List<Task> result = taskRepository.findByAssignedToIdAndBoardUsersId(user.getId(), user.getId());
 
-        assertThat(result).hasSize(2);
-        assertThat(result)
-            .extracting(Task::getTitle).containsExactlyInAnyOrder("tarea1", "tarea2");
+        assertThat(result).hasSize(2)
+                .extracting(Task::getTitle)
+                .containsExactlyInAnyOrder("tarea1", "tarea2");
     }
 
     @Test
-    void findByAssignedStatus_returnList(){
-         User user = userRepository.save(Builders.buildUser("alice"));
-         Board board = boardRepository.save(Builders.buildBoard("Programación", user));
-
-          taskRepository.save(Builders.buildTaskWithStatus("tarea1", board, user, Task.Status.DONE));
-          taskRepository.save(Builders.buildTaskWithStatus("tarea2", board, user, Task.Status.FUTURE));
-          taskRepository.save(Builders.buildTaskWithStatus("tarea3", board, user, Task.Status.FUTURE));
-
-        List<Task> result = taskRepository.findByStatus(Task.Status.DONE);
-
-        assertThat(result).hasSize(1);
-        assertThat(result)
-            .extracting(Task::getTitle).containsExactlyInAnyOrder("tarea1");
-
-             List<Task> result2 = taskRepository.findByStatus(Task.Status.FUTURE);
-
-        assertThat(result2).hasSize(2);
-        assertThat(result2)
-            .extracting(Task::getTitle).containsExactlyInAnyOrder("tarea2", "tarea3");
+    void findByStatus_returnsList() {
+        User user = userRepository.save(Builders.buildUser("alice"));
+        Board board = Builders.buildBoard("Programación", user);
+        board.getUsers().add(user);
+        boardRepository.save(board);
+    
+        taskRepository.save(Builders.buildTaskWithStatus("tarea1", board, user, user, Task.Status.DONE));
+        taskRepository.save(Builders.buildTaskWithStatus("tarea2", board, user, user, Task.Status.FUTURE));
+        taskRepository.save(Builders.buildTaskWithStatus("tarea3", board, user, user, Task.Status.FUTURE));
+    
+        // 🔹 Nueva firma: necesitamos boardId y userId
+        List<Task> doneTasks = taskRepository.findByBoardIdAndStatusAndBoardUsersId(board.getId(), Task.Status.DONE, user.getId());
+        List<Task> futureTasks = taskRepository.findByBoardIdAndStatusAndBoardUsersId(board.getId(), Task.Status.FUTURE, user.getId());
+    
+        assertThat(doneTasks).hasSize(1)
+                .extracting(Task::getTitle)
+                .containsExactly("tarea1");
+    
+        assertThat(futureTasks).hasSize(2)
+                .extracting(Task::getTitle)
+                .containsExactlyInAnyOrder("tarea2", "tarea3");
     }
 
     @Test
-    void deleteCascade_returnEmpty(){
-         User user = userRepository.save(Builders.buildUser("alice"));
-         Board board = boardRepository.save(Builders.buildBoard("Programación", user));
+    void deleteCascade_boardDeletionRemovesTasks() {
+        User user = userRepository.save(Builders.buildUser("alice"));
+        Board board = Builders.buildBoard("Programación", user);
+        board.getUsers().add(user);
+        boardRepository.save(board);
 
-        Task task1 = taskRepository.save(Builders.buildTask("tarea1", board, user));
-        Task task2 = taskRepository.save(Builders.buildTask("tarea2", board, user));
+        Task task1 = taskRepository.save(Builders.buildTask("tarea1", board, user, user));
+        Task task2 = taskRepository.save(Builders.buildTask("tarea2", board, user, user));
 
         board.addTask(task1);
         board.addTask(task2);
-
         boardRepository.save(board);
 
         boardRepository.delete(board);
 
         assertThat(taskRepository.findAll()).isEmpty();
     }
-    
+
     @Test
-    void saveOnNonExistentBoard_returnException() {
+    void saveOnNonExistentBoard_throwsException() {
         Task task = new Task();
-            task.setTitle("Tarea");
+        task.setTitle("Tarea");
 
         Board fakeBoard = new Board();
-            fakeBoard.setId(999L); // ID que no existe
-
-            task.setBoard(fakeBoard);
-            task.setAssignedTo(userRepository.save(Builders.buildUser("bob")));
+        fakeBoard.setId(999L);
+        task.setBoard(fakeBoard);
+        task.setAssignedTo(userRepository.save(Builders.buildUser("bob")));
 
         assertThatThrownBy(() -> taskRepository.saveAndFlush(task))
-            .isInstanceOf(DataIntegrityViolationException.class);
-
+                .isInstanceOf(DataIntegrityViolationException.class);
     }
-
 }

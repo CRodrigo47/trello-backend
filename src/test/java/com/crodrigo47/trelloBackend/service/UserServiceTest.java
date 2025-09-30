@@ -8,6 +8,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 
 import java.util.List;
 import java.util.Optional;
@@ -21,6 +22,9 @@ class UserServiceTest {
 
     @Mock
     UserRepository userRepository;
+
+    @Mock
+    BCryptPasswordEncoder passwordEncoder;
 
     @InjectMocks
     UserService userService;
@@ -46,24 +50,52 @@ class UserServiceTest {
     }
 
     @Test
-    void createUser_returnUser() {
-        when(userRepository.save(any(User.class))).thenReturn(Builders.buildUserWithId("alice", 2L));
+    void existsByUsername_returnsTrueOrFalse() {
+        when(userRepository.existsByUsername("alice")).thenReturn(true);
 
-        var result = userService.createUser(Builders.buildUser("alice"));
+        boolean exists = userService.existsByUsername("alice");
 
-        assertThat(result.getId()).isEqualTo(2L);
-        assertThat(result.getUsername()).isEqualTo("alice");
+        assertThat(exists).isTrue();
+        verify(userRepository).existsByUsername("alice");
     }
 
     @Test
-    void updateUser_returnUser() {
+    void getUserByUsername_returnsOptional() {
+        User user = Builders.buildUserWithId("bob", 1L);
+        when(userRepository.findByUsername("bob")).thenReturn(Optional.of(user));
+
+        var result = userService.getUserByUsername("bob");
+
+        assertThat(result).isPresent();
+        assertThat(result.get().getUsername()).isEqualTo("bob");
+        verify(userRepository).findByUsername("bob");
+    }
+
+    @Test
+    void searchUsersByUsername_returnsList() {
+        when(userRepository.findByUsernameContainingIgnoreCase("bo"))
+                .thenReturn(List.of(Builders.buildUser("bob")));
+
+        var result = userService.searchUsersByUsername("bo");
+
+        assertThat(result).hasSize(1);
+        assertThat(result.get(0).getUsername()).isEqualTo("bob");
+        verify(userRepository).findByUsernameContainingIgnoreCase("bo");
+    }
+
+    @Test
+    void updateUser_encodesPasswordAndSaves() {
         User userToUpdate = Builders.buildUserWithId("bob", 1L);
-        when(userRepository.save(any(User.class))).thenReturn(userToUpdate);
+        userToUpdate.setPassword("plainPassword");
 
-        var result = userService.updateUser(userToUpdate);
+        when(passwordEncoder.encode("plainPassword")).thenReturn("encodedPassword");
+        when(userRepository.save(any(User.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        assertThat(result.getId()).isEqualTo(1L);
-        assertThat(result.getUsername()).isEqualTo("bob");
+        User updated = userService.updateUser(userToUpdate);
+
+        assertThat(updated.getPassword()).isEqualTo("encodedPassword");
+        verify(passwordEncoder).encode("plainPassword");
+        verify(userRepository).save(userToUpdate);
     }
 
     @Test
