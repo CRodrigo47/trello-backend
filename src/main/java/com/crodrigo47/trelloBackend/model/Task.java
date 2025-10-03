@@ -3,7 +3,7 @@ package com.crodrigo47.trelloBackend.model;
 import jakarta.persistence.*;
 import lombok.*;
 import java.time.LocalDateTime;
-import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonProperty;
 
 @Entity
 @Getter
@@ -45,7 +45,7 @@ public class Task {
 
     @ManyToOne
     @JoinColumn(name = "board_id")
-    @JsonIgnore
+    @JsonProperty(access = JsonProperty.Access.WRITE_ONLY)
     private Board board;
 
     private LocalDateTime createdAt;

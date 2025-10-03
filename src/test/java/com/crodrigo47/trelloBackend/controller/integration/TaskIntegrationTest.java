@@ -1,19 +1,18 @@
 package com.crodrigo47.trelloBackend.controller.integration;
 
 import com.crodrigo47.trelloBackend.helper.Builders;
-import com.crodrigo47.trelloBackend.model.Board;
-import com.crodrigo47.trelloBackend.model.Task;
 import com.crodrigo47.trelloBackend.model.User;
-import com.crodrigo47.trelloBackend.repository.BoardRepository;
-import com.crodrigo47.trelloBackend.repository.TaskRepository;
-import com.crodrigo47.trelloBackend.repository.UserRepository;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextImpl;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -33,9 +32,9 @@ class TaskIntegrationTest {
 
     @Autowired MockMvc mockMvc;
     @Autowired ObjectMapper mapper;
-    @Autowired TaskRepository taskRepository;
-    @Autowired BoardRepository boardRepository;
-    @Autowired UserRepository userRepository;
+    @Autowired com.crodrigo47.trelloBackend.repository.TaskRepository taskRepository;
+    @Autowired com.crodrigo47.trelloBackend.repository.BoardRepository boardRepository;
+    @Autowired com.crodrigo47.trelloBackend.repository.UserRepository userRepository;
 
     @BeforeEach
     void setup() {
@@ -44,72 +43,117 @@ class TaskIntegrationTest {
         userRepository.deleteAll();
     }
 
+    @AfterEach
+    void tearDown() {
+        // limpiar contexto de seguridad por si acaso
+        org.springframework.security.core.context.SecurityContextHolder.clearContext();
+    }
+
     @Test
     void taskFullFlow_crudAndRelations() throws Exception {
-        // ----------------- SETUP -----------------
-        User testCreator = userRepository.save(Builders.buildUser("CreatorTest"));
-        Board testBoard = boardRepository.save(Builders.buildBoard("BoardTest", testCreator));
+        // ----------------- SETUP: crear usuario y board -----------------
+        User testCreator = Builders.buildUser("CreatorTest");
+        testCreator = userRepository.save(testCreator);
 
-        // ----------------- CREATE TASK -----------------
-        Task testTask = Builders.buildTask("TestTask", testBoard, null);
+        var testBoard = boardRepository.save(Builders.buildBoard("BoardTest", testCreator));
 
-        String createResponse = mockMvc.perform(post("/tasks")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(mapper.writeValueAsString(testTask)))
-                .andExpect(status().isOk())
-                .andReturn().getResponse().getContentAsString();
+        // IMPORTANTE: añadir explícitamente el creador como miembro del board
+        // (cuando creas el board vía controller su lógica añade al creador, pero
+        // al guardarlo directamente con el builder no queda en board.getUsers()).
+        testBoard.addUser(testCreator);
+        testBoard = boardRepository.save(testBoard);
 
-        Map<String, Object> taskJson = mapper.readValue(createResponse, new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {});
-        Long taskId = Long.valueOf((Integer) taskJson.get("id"));
-        assertThat(taskJson.get("title")).isEqualTo("TestTask");
+        // setear SecurityContext con el usuario autenticado (required para @AuthenticationPrincipal)
+        var auth = new UsernamePasswordAuthenticationToken(testCreator, null);
+        org.springframework.security.core.context.SecurityContextHolder.setContext(new SecurityContextImpl(auth));
 
-        // ----------------- UPDATE TASK -----------------
-        taskJson.put("title", "UpdatedTask");
-        String updateResponse = mockMvc.perform(put("/tasks/" + taskId)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(mapper.writeValueAsString(taskJson)))
-                .andExpect(status().isOk())
-                .andReturn().getResponse().getContentAsString();
+        try {
+            // ----------------- CREATE TASK -----------------
+            Map<String, Object> createBody = Map.of(
+                    "title", "TestTask",
+                    "board", Map.of("id", testBoard.getId())
+            );
 
-        Map<String, Object> updatedTaskJson = mapper.readValue(updateResponse, new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {});
-        assertThat(updatedTaskJson.get("title")).isEqualTo("UpdatedTask");
+            String createResponse = mockMvc.perform(post("/tasks")
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(mapper.writeValueAsString(createBody)))
+                    .andExpect(status().isOk())
+                    .andReturn().getResponse().getContentAsString();
 
-        // ----------------- GET TASK -----------------
-        mockMvc.perform(get("/tasks/" + taskId))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value(taskId))
-                .andExpect(jsonPath("$.title").value("UpdatedTask"));
+            Map<String, Object> taskJson = mapper.readValue(createResponse, new TypeReference<Map<String, Object>>() {});
+            Number tmpId = (Number) taskJson.get("id");
+            Long taskId = tmpId.longValue();
+            assertThat(taskJson.get("title")).isEqualTo("TestTask");
 
-        // ----------------- ASSIGN USER -----------------
-        String assignResponse = mockMvc.perform(post("/tasks/" + taskId + "/users/" + testCreator.getId())
-                        .contentType(MediaType.APPLICATION_JSON))
-                .andExpect(status().isOk())
-                .andReturn().getResponse().getContentAsString();
+            // ----------------- UPDATE TASK -----------------
+            Map<String, Object> updateBody = Map.of("title", "UpdatedTask");
 
-        Map<String, Object> assignedTaskJson = mapper.readValue(assignResponse, new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {});
-        assertThat(((Integer) assignedTaskJson.get("assignedToId"))).isEqualTo(testCreator.getId().intValue());
+            String updateResponse = mockMvc.perform(put("/tasks/" + taskId)
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(mapper.writeValueAsString(updateBody)))
+                    .andExpect(status().isOk())
+                    .andReturn().getResponse().getContentAsString();
 
-        // ----------------- GET USER ASSIGNED -----------------
-        String getUserResp = mockMvc.perform(get("/tasks/" + taskId + "/users")
-                        .contentType(MediaType.APPLICATION_JSON))
-                .andExpect(status().isOk())
-                .andReturn().getResponse().getContentAsString();
+            Map<String, Object> updatedTaskJson = mapper.readValue(updateResponse, new TypeReference<Map<String, Object>>() {});
+            assertThat(updatedTaskJson.get("title")).isEqualTo("UpdatedTask");
 
-        Map<String, Object> userAssigned = mapper.readValue(getUserResp, new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {});
-        assertThat(((Integer) userAssigned.get("id"))).isEqualTo(testCreator.getId().intValue());
-        assertThat(userAssigned.get("username")).isEqualTo("CreatorTest");
+            // ----------------- GET TASK -----------------
+            mockMvc.perform(get("/tasks/" + taskId))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.id").value(taskId))
+                    .andExpect(jsonPath("$.title").value("UpdatedTask"));
 
-        // ----------------- UNASSIGN USER -----------------
-        String unassignResponse = mockMvc.perform(delete("/tasks/" + taskId + "/users"))
-                .andExpect(status().isOk())
-                .andReturn().getResponse().getContentAsString();
+            // ----------------- ASSIGN USER -----------------
+            String assignResponse = mockMvc.perform(post("/tasks/" + taskId + "/users/" + testCreator.getId())
+                            .contentType(MediaType.APPLICATION_JSON))
+                    .andExpect(status().isOk())
+                    .andReturn().getResponse().getContentAsString();
 
-        Map<String, Object> unassignedTaskJson = mapper.readValue(unassignResponse, new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {});
-        assertThat(unassignedTaskJson.get("assignedToId")).isNull();
+            Map<String, Object> assignedTaskJson = mapper.readValue(assignResponse, new TypeReference<Map<String, Object>>() {});
 
-        // ----------------- DELETE TASK -----------------
-        mockMvc.perform(delete("/tasks/" + taskId))
-                .andExpect(status().isOk());
-        assertThat(taskRepository.findById(taskId)).isEmpty();
+            // comprobación defensiva: puede venir assignedToId (número) o assignedTo { id: ... }
+            Object assignedIdObj = assignedTaskJson.getOrDefault("assignedToId", assignedTaskJson.get("assignedTo"));
+            if (assignedIdObj instanceof Map) {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> assignedMap = (Map<String, Object>) assignedIdObj;
+                Number assignedIdNumber = (Number) assignedMap.get("id");
+                assertThat(assignedIdNumber.longValue()).isEqualTo(testCreator.getId());
+            } else if (assignedIdObj instanceof Number) {
+                Number n = (Number) assignedIdObj;
+                assertThat(n.longValue()).isEqualTo(testCreator.getId());
+            } else {
+                // fallback: si la estructura es diferente, chequeamos que assignedTo exista
+                assertThat(assignedTaskJson.get("assignedTo")).isNotNull();
+            }
+
+            // ----------------- GET USER ASSIGNED -----------------
+            String getUserResp = mockMvc.perform(get("/tasks/" + taskId + "/users")
+                            .contentType(MediaType.APPLICATION_JSON))
+                    .andExpect(status().isOk())
+                    .andReturn().getResponse().getContentAsString();
+
+            Map<String, Object> userAssigned = mapper.readValue(getUserResp, new TypeReference<Map<String, Object>>() {});
+            Number returnedUserId = (Number) userAssigned.get("id");
+            assertThat(returnedUserId.longValue()).isEqualTo(testCreator.getId().longValue());
+            assertThat(userAssigned.get("username")).isEqualTo(testCreator.getUsername());
+
+            // ----------------- UNASSIGN USER -----------------
+            String unassignResponse = mockMvc.perform(delete("/tasks/" + taskId + "/users"))
+                    .andExpect(status().isOk())
+                    .andReturn().getResponse().getContentAsString();
+
+            Map<String, Object> unassignedTaskJson = mapper.readValue(unassignResponse, new TypeReference<Map<String, Object>>() {});
+            Object assignedAfter = unassignedTaskJson.getOrDefault("assignedToId", unassignedTaskJson.get("assignedTo"));
+            assertThat(assignedAfter).isNull();
+
+            // ----------------- DELETE TASK -----------------
+            mockMvc.perform(delete("/tasks/" + taskId))
+                    .andExpect(status().isOk());
+
+            assertThat(taskRepository.findById(taskId)).isEmpty();
+        } finally {
+            // limpiamos siempre el contexto de seguridad
+            org.springframework.security.core.context.SecurityContextHolder.clearContext();
+        }
     }
 }

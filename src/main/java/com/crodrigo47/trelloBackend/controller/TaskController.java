@@ -42,6 +42,7 @@ public class TaskController {
     public TaskDto updateTask(@PathVariable Long id,
                               @RequestBody Task task,
                               @AuthenticationPrincipal User currentUser) {
+        task.setId(id);
         Task updated = taskService.updateTask(task, currentUser);
         return DtoMapper.toTaskDto(updated);
     }
