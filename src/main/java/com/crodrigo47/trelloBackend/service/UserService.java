@@ -54,8 +54,17 @@ public class UserService {
     }
 
     public User getCurrentUser() {
-        String username = (String) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+        String username;
+        if (principal instanceof org.springframework.security.core.userdetails.UserDetails) {
+            username = ((org.springframework.security.core.userdetails.UserDetails) principal).getUsername();
+        } else if (principal instanceof com.crodrigo47.trelloBackend.model.User) {
+            username = ((com.crodrigo47.trelloBackend.model.User) principal).getUsername();
+        } else {
+            username = String.valueOf(principal);
+        }
         return userRepository.findByUsername(username)
             .orElseThrow(() -> new RuntimeException("Authenticated user not found"));
     }
+    
 }

@@ -52,13 +52,19 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 UserDetails userDetails = userDetailsService.loadUserByUsername(username);
 
                 if (jwtUtil.validateToken(token, userDetails)) {
+                    Object principal = userDetails;
+                    // si es tu CustomUserDetails extrae el User real
+                    if (userDetails instanceof com.crodrigo47.trelloBackend.config.CustomUserDetails) {
+                        principal = ((com.crodrigo47.trelloBackend.config.CustomUserDetails) userDetails).getUser();
+                    }
+                
                     UsernamePasswordAuthenticationToken authToken =
                             new UsernamePasswordAuthenticationToken(
-                                    userDetails,
+                                    principal,
                                     null,
                                     userDetails.getAuthorities()
                             );
-
+                
                     authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                     SecurityContextHolder.getContext().setAuthentication(authToken);
                 }
