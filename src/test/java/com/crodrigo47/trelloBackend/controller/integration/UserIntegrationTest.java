@@ -10,6 +10,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -30,55 +31,65 @@ class UserIntegrationTest {
     @Autowired MockMvc mockMvc;
     @Autowired ObjectMapper mapper;
     @Autowired com.crodrigo47.trelloBackend.repository.UserRepository userRepository;
+    @Autowired BCryptPasswordEncoder passwordEncoder;
 
     @BeforeEach
     void setup() {
         userRepository.deleteAll();
     }
 
-        @Test
-        void userFullFlow_crud_withoutCreate() throws Exception {
-            String username = "alice";
-            String updatedUsername = "aliceUpdated";
+    @Test
+    void userFullFlow_crud_withoutCreate() throws Exception {
+        String username = "alice";
+        String updatedUsername = "aliceUpdated";
 
-            // ----------------- SETUP: CREAR USUARIO DIRECTAMENTE -----------------
-            User user = Builders.buildUser(username);
-            user = userRepository.save(user); // guardamos en DB directamente
-            Long userId = user.getId();
+        // ----------------- SETUP: CREAR USUARIO DIRECTAMENTE (con password codificada) -----------------
+        User user = Builders.buildUser(username);
+        user.setPassword(passwordEncoder.encode(username)); // importante: codificar la password para que matches() funcione
+        user = userRepository.save(user); // guardamos en DB directamente
+        Long userId = user.getId();
 
-            // ----------------- UPDATE -----------------
-            Map<String, String> updateBody = Map.of(
-                "username", updatedUsername,
-                "currentPassword", username // coincidir con la password original
-            );
+        // ----------------- PREPARAR UN ADMIN PARA LA PETICIÓN DE LISTADO -----------------
+        User admin = Builders.buildUser("admin");
+        admin.setRole(User.Role.ADMIN);
+        admin.setPassword(passwordEncoder.encode("admin"));
+        admin = userRepository.save(admin);
 
-            String updateResp = mockMvc.perform(put("/users/" + userId)
-                            .principal(new UsernamePasswordAuthenticationToken(username, null))
-                            .contentType(MediaType.APPLICATION_JSON)
-                            .content(mapper.writeValueAsString(updateBody)))
-                    .andExpect(status().isOk())
-                    .andReturn().getResponse().getContentAsString();
+        // ----------------- UPDATE -----------------
+        Map<String, String> updateBody = Map.of(
+            "username", updatedUsername,
+            "currentPassword", username // coincide con la password original no codificada
+        );
 
-            @SuppressWarnings("unchecked")
-            Map<String, Object> updatedUserJson = mapper.readValue(updateResp, Map.class);
-            assertThat(updatedUserJson.get("username")).isEqualTo(updatedUsername);
+        String updateResp = mockMvc.perform(put("/users/" + userId)
+                        .principal(new UsernamePasswordAuthenticationToken(username, null)) // principal = nombre antiguo
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(mapper.writeValueAsString(updateBody)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
 
-            // ----------------- GET -----------------
-            mockMvc.perform(get("/users/" + userId))
-                    .andExpect(status().isOk())
-                    .andExpect(jsonPath("$.id").value(userId))
-                    .andExpect(jsonPath("$.username").value(updatedUsername));
+        @SuppressWarnings("unchecked")
+        Map<String, Object> updatedUserJson = mapper.readValue(updateResp, Map.class);
+        assertThat(updatedUserJson.get("username")).isEqualTo(updatedUsername);
 
-            // ----------------- LIST -----------------
-            mockMvc.perform(get("/users"))
-                    .andExpect(status().isOk())
-                    .andExpect(jsonPath("$[0].id").value(userId));
+        // ----------------- GET (con principal del mismo usuario actualizado) -----------------
+        mockMvc.perform(get("/users/" + userId)
+                .principal(new UsernamePasswordAuthenticationToken(updatedUsername, null)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(userId))
+                .andExpect(jsonPath("$.username").value(updatedUsername));
 
-            // ----------------- DELETE -----------------
-            mockMvc.perform(delete("/users/" + userId)
-                    .principal(new UsernamePasswordAuthenticationToken(updatedUsername, null)))
-                    .andExpect(status().isOk());
+        // ----------------- LIST (requiere ADMIN) -----------------
+        mockMvc.perform(get("/users")
+                .principal(new UsernamePasswordAuthenticationToken(admin.getUsername(), null)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(userId));
 
-            assertThat(userRepository.findById(userId)).isEmpty();
-   }
+        // ----------------- DELETE (principal = usuario actualizado) -----------------
+        mockMvc.perform(delete("/users/" + userId)
+                .principal(new UsernamePasswordAuthenticationToken(updatedUsername, null)))
+                .andExpect(status().isOk());
+
+        assertThat(userRepository.findById(userId)).isEmpty();
+    }
 }

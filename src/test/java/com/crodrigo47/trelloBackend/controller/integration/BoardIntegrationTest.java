@@ -1,19 +1,18 @@
 package com.crodrigo47.trelloBackend.controller.integration;
 
 import com.crodrigo47.trelloBackend.helper.Builders;
-import com.crodrigo47.trelloBackend.model.Board;
-import com.crodrigo47.trelloBackend.model.Task;
 import com.crodrigo47.trelloBackend.model.User;
-import com.crodrigo47.trelloBackend.repository.BoardRepository;
-import com.crodrigo47.trelloBackend.repository.TaskRepository;
-import com.crodrigo47.trelloBackend.repository.UserRepository;
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.context.SecurityContextImpl;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -34,9 +33,9 @@ class BoardIntegrationTest {
 
     @Autowired MockMvc mockMvc;
     @Autowired ObjectMapper mapper;
-    @Autowired BoardRepository boardRepository;
-    @Autowired UserRepository userRepository;
-    @Autowired TaskRepository taskRepository;
+    @Autowired com.crodrigo47.trelloBackend.repository.BoardRepository boardRepository;
+    @Autowired com.crodrigo47.trelloBackend.repository.UserRepository userRepository;
+    @Autowired com.crodrigo47.trelloBackend.repository.TaskRepository taskRepository;
 
     @BeforeEach
     void setup() {
@@ -45,93 +44,107 @@ class BoardIntegrationTest {
         userRepository.deleteAll();
     }
 
-@Test
-void boardFullFlow_crudAndRelations() throws Exception {
-    // ----------------- PREPARAR USUARIO -----------------
-    User creator = userRepository.save(Builders.buildUser("bob"));
+    @AfterEach
+    void tearDown() {
+        // Limpieza adicional de contexto de seguridad por si acaso
+        org.springframework.security.core.context.SecurityContextHolder.clearContext();
+    }
 
-    // ----------------- CREATE -----------------
-    String boardName = "IntegrationBoard";
-    String updatedBoardName = "UpdatedBoard";
+    @Test
+    void boardFullFlow_crudAndRelations() throws Exception {
+        // ----------------- PREPARAR USUARIO (creator) -----------------
+        User creator = Builders.buildUser("bob");
+        creator = userRepository.save(creator);
 
-    String createResponse = mockMvc.perform(post("/boards")
-            .param("userId", creator.getId().toString()) // 👈 Pasamos el usuario
-            .contentType(MediaType.APPLICATION_JSON)
-            .content(mapper.writeValueAsString(Map.of("name", boardName))))
-            .andExpect(status().isOk())
-            .andReturn().getResponse().getContentAsString();
+        // Ponemos el SecurityContext con el usuario 'creator' para todas las peticiones que requieran @AuthenticationPrincipal
+        var auth = new UsernamePasswordAuthenticationToken(creator, null);
+        org.springframework.security.core.context.SecurityContextHolder.setContext(new SecurityContextImpl(auth));
 
-    Map<String, Object> boardJson = mapper.readValue(createResponse, new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {});
-    Long boardId = Long.valueOf((Integer) boardJson.get("id"));
-    assertThat(boardJson.get("name")).isEqualTo(boardName);
-    assertThat(boardRepository.findById(boardId)).isPresent();
+        try {
+            // ----------------- CREATE -----------------
+            String boardName = "IntegrationBoard";
+            String updatedBoardName = "UpdatedBoard";
 
-    // ----------------- UPDATE -----------------
-    boardJson.put("name", updatedBoardName);
-    String updateResponse = mockMvc.perform(put("/boards/" + boardId)
-            .param("userId", creator.getId().toString()) // 👈 Pasamos el usuario
-            .contentType(MediaType.APPLICATION_JSON)
-            .content(mapper.writeValueAsString(boardJson)))
-            .andExpect(status().isOk())
-            .andReturn().getResponse().getContentAsString();
+            String createResponse = mockMvc.perform(post("/boards")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(mapper.writeValueAsString(Map.of("name", boardName))))
+                    .andExpect(status().isOk())
+                    .andReturn().getResponse().getContentAsString();
 
-    Map<String, Object> updatedBoardJson = mapper.readValue(updateResponse, new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {});
-    assertThat(updatedBoardJson.get("name")).isEqualTo(updatedBoardName);
+            Map<String, Object> boardJson = mapper.readValue(createResponse, new TypeReference<Map<String, Object>>() {});
+            Number tmpId = (Number) boardJson.get("id");
+            Long boardId = tmpId.longValue();
+            assertThat(boardJson.get("name")).isEqualTo(boardName);
+            assertThat(boardRepository.findById(boardId)).isPresent();
 
-    // ----------------- ADD USER -----------------
-    User boardUser = userRepository.save(Builders.buildUser("alice"));
-    String addUserResponse = mockMvc.perform(post("/boards/" + boardId + "/users/" + boardUser.getId())
-            .param("userId", creator.getId().toString()) // 👈 Pasamos el usuario
-            .contentType(MediaType.APPLICATION_JSON))
-            .andExpect(status().isOk())
-            .andReturn().getResponse().getContentAsString();
+            // ----------------- UPDATE -----------------
+            boardJson.put("name", updatedBoardName);
+            String updateResponse = mockMvc.perform(put("/boards/" + boardId)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(mapper.writeValueAsString(boardJson)))
+                    .andExpect(status().isOk())
+                    .andReturn().getResponse().getContentAsString();
 
-    Map<String, Object> boardWithUserJson = mapper.readValue(addUserResponse, new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {});
-    @SuppressWarnings("unchecked")
-    List<Object> userIds = (List<Object>) boardWithUserJson.get("userIds");
-    assertThat(userIds).contains(boardUser.getId().intValue());
+            Map<String, Object> updatedBoardJson = mapper.readValue(updateResponse, new TypeReference<Map<String, Object>>() {});
+            assertThat(updatedBoardJson.get("name")).isEqualTo(updatedBoardName);
 
-    // ----------------- ADD TASK -----------------
-    Board boardEntity = boardRepository.findById(boardId).orElseThrow();
-    Task boardTask = taskRepository.save(Builders.buildTask("task1", boardEntity, boardUser));
-    String addTaskResponse = mockMvc.perform(post("/boards/" + boardId + "/tasks")
-        .param("userId", creator.getId().toString()) // 👈 Pasamos el usuario
-        .contentType(MediaType.APPLICATION_JSON)
-        .content(mapper.writeValueAsString(Map.of("id", boardTask.getId()))))
-        .andExpect(status().isOk())
-        .andReturn().getResponse().getContentAsString();
+            // ----------------- ADD USER -----------------
+            User boardUser = userRepository.save(Builders.buildUser("alice"));
 
-    Map<String, Object> boardWithTaskJson = mapper.readValue(addTaskResponse, new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {});
-    @SuppressWarnings("unchecked")
-    List<Object> taskIds = (List<Object>) boardWithTaskJson.get("taskIds");
-    assertThat(taskIds).contains(boardTask.getId().intValue());
+            String addUserResponse = mockMvc.perform(post("/boards/" + boardId + "/users/" + boardUser.getId())
+                    .contentType(MediaType.APPLICATION_JSON))
+                    .andExpect(status().isOk())
+                    .andReturn().getResponse().getContentAsString();
 
-    // ----------------- GET TASKS -----------------
-    mockMvc.perform(get("/boards/" + boardId + "/tasks"))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$[0].id").value(boardTask.getId()))
-            .andExpect(jsonPath("$[0].title").value(boardTask.getTitle()));
+            Map<String, Object> boardWithUserJson = mapper.readValue(addUserResponse, new TypeReference<Map<String, Object>>() {});
+            @SuppressWarnings("unchecked")
+            List<Object> userIds = (List<Object>) boardWithUserJson.get("userIds");
+            assertThat(userIds).contains(boardUser.getId().intValue());
 
-    // ----------------- GET USERS -----------------
-    mockMvc.perform(get("/boards/" + boardId + "/users"))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$[0].id").value(creator.getId()))
-            .andExpect(jsonPath("$[0].username").value(creator.getUsername()));
+            // ----------------- ADD TASK (creada por el endpoint) -----------------
+            String taskTitle = "task1";
+            String addTaskResponse = mockMvc.perform(post("/boards/" + boardId + "/tasks")
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .content(mapper.writeValueAsString(Map.of("title", taskTitle))))
+                    .andExpect(status().isOk())
+                    .andReturn().getResponse().getContentAsString();
 
-    // ----------------- REMOVE USER -----------------
-    mockMvc.perform(delete("/boards/" + boardId + "/users/" + boardUser.getId())
-            .param("userId", creator.getId().toString())) // 👈 Pasamos el usuario
-            .andExpect(status().isOk());
+            Map<String, Object> boardWithTaskJson = mapper.readValue(addTaskResponse, new TypeReference<Map<String, Object>>() {});
+            @SuppressWarnings("unchecked")
+            List<Object> taskIds = (List<Object>) boardWithTaskJson.get("taskIds");
+            assertThat(taskIds).isNotEmpty();
 
-    // ----------------- REMOVE TASK -----------------
-    mockMvc.perform(delete("/boards/" + boardId + "/tasks/" + boardTask.getId())
-            .param("userId", creator.getId().toString())) // 👈 Pasamos el usuario
-            .andExpect(status().isOk());
+            // coger el id creado para comparar más abajo
+            Integer addedTaskId = (Integer) taskIds.get(0);
 
-    // ----------------- DELETE BOARD -----------------
-    mockMvc.perform(delete("/boards/" + boardId)
-            .param("userId", creator.getId().toString())) // 👈 Pasamos el usuario
-            .andExpect(status().isOk());
-    assertThat(boardRepository.findById(boardId)).isEmpty();
-}
+            // ----------------- GET TASKS -----------------
+            mockMvc.perform(get("/boards/" + boardId + "/tasks"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$[0].id").value(addedTaskId))
+                    .andExpect(jsonPath("$[0].title").value(taskTitle));
+
+            // ----------------- GET USERS -----------------
+            mockMvc.perform(get("/boards/" + boardId + "/users"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$[0].id").value(creator.getId()))
+                    .andExpect(jsonPath("$[0].username").value(creator.getUsername()));
+
+            // ----------------- REMOVE USER -----------------
+            mockMvc.perform(delete("/boards/" + boardId + "/users/" + boardUser.getId()))
+                    .andExpect(status().isOk());
+
+            // ----------------- REMOVE TASK -----------------
+            mockMvc.perform(delete("/boards/" + boardId + "/tasks/" + addedTaskId))
+                    .andExpect(status().isOk());
+
+            // ----------------- DELETE BOARD -----------------
+            mockMvc.perform(delete("/boards/" + boardId))
+                    .andExpect(status().isOk());
+
+            assertThat(boardRepository.findById(boardId)).isEmpty();
+        } finally {
+            // siempre limpiamos el contexto de seguridad
+            org.springframework.security.core.context.SecurityContextHolder.clearContext();
+        }
+    }
 }
