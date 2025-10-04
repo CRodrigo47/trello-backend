@@ -58,13 +58,11 @@ class TaskIntegrationTest {
         var testBoard = boardRepository.save(Builders.buildBoard("BoardTest", testCreator));
 
         // IMPORTANTE: añadir explícitamente el creador como miembro del board
-        // (cuando creas el board vía controller su lógica añade al creador, pero
-        // al guardarlo directamente con el builder no queda en board.getUsers()).
         testBoard.addUser(testCreator);
         testBoard = boardRepository.save(testBoard);
 
-        // setear SecurityContext con el usuario autenticado (required para @AuthenticationPrincipal)
-        var auth = new UsernamePasswordAuthenticationToken(testCreator, null);
+        // setear SecurityContext con el username (String) como principal
+        var auth = new UsernamePasswordAuthenticationToken(testCreator.getUsername(), null);
         org.springframework.security.core.context.SecurityContextHolder.setContext(new SecurityContextImpl(auth));
 
         try {

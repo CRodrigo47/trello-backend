@@ -11,8 +11,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
-import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.core.context.SecurityContextImpl;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -46,26 +44,23 @@ class BoardIntegrationTest {
 
     @AfterEach
     void tearDown() {
-        // Limpieza adicional de contexto de seguridad por si acaso
         org.springframework.security.core.context.SecurityContextHolder.clearContext();
     }
 
     @Test
     void boardFullFlow_crudAndRelations() throws Exception {
         // ----------------- PREPARAR USUARIO (creator) -----------------
-        User creator = Builders.buildUser("bob");
-        creator = userRepository.save(creator);
+        User user = Builders.buildUser("bob");
+        User creator = userRepository.save(user);
 
-        // Ponemos el SecurityContext con el usuario 'creator' para todas las peticiones que requieran @AuthenticationPrincipal
-        var auth = new UsernamePasswordAuthenticationToken(creator, null);
-        org.springframework.security.core.context.SecurityContextHolder.setContext(new SecurityContextImpl(auth));
-
+        // NOTA: inyectamos el principal en cada request con .principal(...)
         try {
             // ----------------- CREATE -----------------
             String boardName = "IntegrationBoard";
             String updatedBoardName = "UpdatedBoard";
 
             String createResponse = mockMvc.perform(post("/boards")
+                    .principal(() -> creator.getUsername())
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(mapper.writeValueAsString(Map.of("name", boardName))))
                     .andExpect(status().isOk())
@@ -80,6 +75,7 @@ class BoardIntegrationTest {
             // ----------------- UPDATE -----------------
             boardJson.put("name", updatedBoardName);
             String updateResponse = mockMvc.perform(put("/boards/" + boardId)
+                    .principal(() -> creator.getUsername())
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(mapper.writeValueAsString(boardJson)))
                     .andExpect(status().isOk())
@@ -92,6 +88,7 @@ class BoardIntegrationTest {
             User boardUser = userRepository.save(Builders.buildUser("alice"));
 
             String addUserResponse = mockMvc.perform(post("/boards/" + boardId + "/users/" + boardUser.getId())
+                    .principal(() -> creator.getUsername())
                     .contentType(MediaType.APPLICATION_JSON))
                     .andExpect(status().isOk())
                     .andReturn().getResponse().getContentAsString();
@@ -104,6 +101,7 @@ class BoardIntegrationTest {
             // ----------------- ADD TASK (creada por el endpoint) -----------------
             String taskTitle = "task1";
             String addTaskResponse = mockMvc.perform(post("/boards/" + boardId + "/tasks")
+                    .principal(() -> creator.getUsername())
                     .contentType(MediaType.APPLICATION_JSON)
                     .content(mapper.writeValueAsString(Map.of("title", taskTitle))))
                     .andExpect(status().isOk())
@@ -118,32 +116,33 @@ class BoardIntegrationTest {
             Integer addedTaskId = (Integer) taskIds.get(0);
 
             // ----------------- GET TASKS -----------------
-            mockMvc.perform(get("/boards/" + boardId + "/tasks"))
+            mockMvc.perform(get("/boards/" + boardId + "/tasks").principal(() -> creator.getUsername()))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$[0].id").value(addedTaskId))
                     .andExpect(jsonPath("$[0].title").value(taskTitle));
 
             // ----------------- GET USERS -----------------
-            mockMvc.perform(get("/boards/" + boardId + "/users"))
+            mockMvc.perform(get("/boards/" + boardId + "/users").principal(() -> creator.getUsername()))
                     .andExpect(status().isOk())
                     .andExpect(jsonPath("$[0].id").value(creator.getId()))
                     .andExpect(jsonPath("$[0].username").value(creator.getUsername()));
 
             // ----------------- REMOVE USER -----------------
-            mockMvc.perform(delete("/boards/" + boardId + "/users/" + boardUser.getId()))
+            mockMvc.perform(delete("/boards/" + boardId + "/users/" + boardUser.getId())
+                    .principal(() -> creator.getUsername()))
                     .andExpect(status().isOk());
 
             // ----------------- REMOVE TASK -----------------
-            mockMvc.perform(delete("/boards/" + boardId + "/tasks/" + addedTaskId))
+            mockMvc.perform(delete("/boards/" + boardId + "/tasks/" + addedTaskId)
+                    .principal(() -> creator.getUsername()))
                     .andExpect(status().isOk());
 
             // ----------------- DELETE BOARD -----------------
-            mockMvc.perform(delete("/boards/" + boardId))
+            mockMvc.perform(delete("/boards/" + boardId).principal(() -> creator.getUsername()))
                     .andExpect(status().isOk());
 
             assertThat(boardRepository.findById(boardId)).isEmpty();
         } finally {
-            // siempre limpiamos el contexto de seguridad
             org.springframework.security.core.context.SecurityContextHolder.clearContext();
         }
     }
