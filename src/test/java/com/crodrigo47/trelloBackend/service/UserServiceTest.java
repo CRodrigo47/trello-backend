@@ -1,5 +1,6 @@
 package com.crodrigo47.trelloBackend.service;
 
+import com.crodrigo47.trelloBackend.dto.UserSearchDto;
 import com.crodrigo47.trelloBackend.helper.Builders;
 import com.crodrigo47.trelloBackend.model.User;
 import com.crodrigo47.trelloBackend.repository.UserRepository;
@@ -15,6 +16,7 @@ import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -72,15 +74,19 @@ class UserServiceTest {
     }
 
     @Test
-    void searchUsersByUsername_returnsList() {
-        when(userRepository.findByUsernameContainingIgnoreCase("bo"))
-                .thenReturn(List.of(Builders.buildUser("bob")));
+    void searchUsersByPrefix_returnsListOfUserSearchDto() {
+        // PRE: repository now returns UserSearchDto (JPQL projection)
+        UserSearchDto dto = new UserSearchDto(2L, "bob");
+        // match any Pageable
+        when(userRepository.searchByUsernamePrefix(eq("bo"), any(org.springframework.data.domain.Pageable.class)))
+                .thenReturn(List.of(dto));
 
-        var result = userService.searchUsersByUsername("bo");
+        var result = userService.searchUsersByPrefix("bo", 10);
 
         assertThat(result).hasSize(1);
-        assertThat(result.get(0).getUsername()).isEqualTo("bob");
-        verify(userRepository).findByUsernameContainingIgnoreCase("bo");
+        assertThat(result.get(0).username()).isEqualTo("bob");
+        assertThat(result.get(0).id()).isEqualTo(2L);
+        verify(userRepository).searchByUsernamePrefix(eq("bo"), any(org.springframework.data.domain.Pageable.class));
     }
 
     @Test

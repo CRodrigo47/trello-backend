@@ -3,10 +3,12 @@ package com.crodrigo47.trelloBackend.service;
 import java.util.List;
 import java.util.Optional;
 
+import org.springframework.data.domain.PageRequest;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import com.crodrigo47.trelloBackend.dto.UserSearchDto;
 import com.crodrigo47.trelloBackend.model.User;
 import com.crodrigo47.trelloBackend.repository.UserRepository;
 
@@ -38,8 +40,9 @@ public class UserService {
         return userRepository.findByUsername(username);
     }
 
-    public List<User> searchUsersByUsername(String username) {
-        return userRepository.findByUsernameContainingIgnoreCase(username);
+    public List<UserSearchDto> searchUsersByPrefix(String prefix, int limit) {
+        var pageable = PageRequest.of(0, Math.max(1, limit));
+        return userRepository.searchByUsernamePrefix(prefix, pageable);
     }
 
     public User updateUser(User user){

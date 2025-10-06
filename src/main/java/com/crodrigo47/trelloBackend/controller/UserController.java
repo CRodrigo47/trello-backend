@@ -2,10 +2,12 @@ package com.crodrigo47.trelloBackend.controller;
 
 import org.springframework.web.bind.annotation.*;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 
 import com.crodrigo47.trelloBackend.dto.DtoMapper;
 import com.crodrigo47.trelloBackend.dto.UserDto;
+import com.crodrigo47.trelloBackend.dto.UserSearchDto;
 import com.crodrigo47.trelloBackend.exception.InvalidPasswordException;
 import com.crodrigo47.trelloBackend.exception.UserNotFoundException;
 import com.crodrigo47.trelloBackend.model.User;
@@ -22,12 +24,12 @@ public class UserController {
     private final BCryptPasswordEncoder passwordEncoder;
     private final UserService userService;
 
-    public UserController(UserService userService, BCryptPasswordEncoder passwordEncoder){
+    public UserController(UserService userService, BCryptPasswordEncoder passwordEncoder) {
         this.userService = userService;
         this.passwordEncoder = passwordEncoder;
     }
 
-    // Solo ADMIN puede listar todos
+    // Solo ADMIN puede listar todos los usuarios
     @GetMapping
     public List<UserDto> getAllUsers(Principal principal) {
         User current = userService.getUserByUsername(principal.getName())
@@ -42,6 +44,7 @@ public class UserController {
                 .toList();
     }
 
+    // Obtener un usuario por ID (solo para sí mismo o ADMIN)
     @GetMapping("/{id}")
     public UserDto getUserById(@PathVariable Long id, Principal principal) {
         User current = userService.getUserByUsername(principal.getName())
@@ -57,6 +60,21 @@ public class UserController {
         return DtoMapper.toUserDto(user);
     }
 
+    @GetMapping("/search")
+    public List<UserSearchDto> searchUsers(
+            @RequestParam("username") String prefix,
+            @RequestParam(value = "limit", required = false, defaultValue = "10") int limit,
+            @AuthenticationPrincipal String username // para validar que hay un user autenticado
+    ) {
+        // opcional: validar que el caller existe
+        userService.getUserByUsername(username)
+            .orElseThrow(() -> new UserNotFoundException("Current user not found"));
+
+        // delegar al service
+        return userService.searchUsersByPrefix(prefix, limit);
+    }
+
+    // Actualizar el perfil del usuario actual
     @PutMapping("/{id}")
     public UserDto updateUser(
             @PathVariable Long id,
@@ -80,12 +98,13 @@ public class UserController {
             if (currentPassword == null || !passwordEncoder.matches(currentPassword, user.getPassword())) {
                 throw new InvalidPasswordException("Current password is incorrect");
             }
-            user.setPassword(body.get("newPassword")); // Codificación se hace en service
+            user.setPassword(body.get("newPassword")); // Codificación en el service
         }
 
         return DtoMapper.toUserDto(userService.updateUser(user));
     }
 
+    // Eliminar la propia cuenta
     @DeleteMapping("/{id}")
     public void deleteUser(@PathVariable Long id, Principal principal) {
         User current = userService.getUserByUsername(principal.getName())

@@ -15,6 +15,7 @@ import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.Map;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
@@ -92,4 +93,41 @@ class UserIntegrationTest {
 
         assertThat(userRepository.findById(userId)).isEmpty();
     }
+
+        // -------------------------- NEW: SEARCH (integration) -------------------------- //
+        @Test
+        void searchUsers_integration_returnsMatches() throws Exception {
+            // crear el usuario que realizará la petición (debe existir para que controller haga userService.getUserByUsername(principal))
+            User caller = Builders.buildUser("caller");
+            caller.setPassword(passwordEncoder.encode("caller"));
+            caller = userRepository.save(caller);
+
+            // usuarios que deben aparecer en la búsqueda
+            userRepository.save(Builders.buildUser("ana"));
+            userRepository.save(Builders.buildUser("anabel"));
+            // usuario que no debe aparecer
+            userRepository.save(Builders.buildUser("bernardo"));
+
+            // Seteamos el SecurityContext con la Authentication (el controller usa @AuthenticationPrincipal)
+            var auth = new UsernamePasswordAuthenticationToken(caller.getUsername(), null);
+            org.springframework.security.core.context.SecurityContextHolder.setContext(new org.springframework.security.core.context.SecurityContextImpl(auth));
+
+            try {
+                String resp = mockMvc.perform(get("/users/search")
+                            .param("username", "ana"))
+                        .andExpect(status().isOk())
+                        .andReturn().getResponse().getContentAsString();
+
+                // parsear respuesta y comprobar usernames (orden no comprometido)
+                @SuppressWarnings("unchecked")
+                List<Map<String, Object>> result = mapper.readValue(resp, List.class);
+                assertThat(result).extracting(m -> m.get("username")).containsExactlyInAnyOrder("ana", "anabel");
+                // y también que traen id
+                assertThat(result).allMatch(m -> m.get("id") != null);
+            } finally {
+                // limpiamos siempre el contexto de seguridad
+                org.springframework.security.core.context.SecurityContextHolder.clearContext();
+            }
+        }
+
 }

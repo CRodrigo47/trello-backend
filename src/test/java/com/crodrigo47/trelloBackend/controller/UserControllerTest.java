@@ -3,6 +3,7 @@ package com.crodrigo47.trelloBackend.controller;
 import com.crodrigo47.trelloBackend.config.JwtAuthenticationFilter;
 import com.crodrigo47.trelloBackend.dto.DtoMapper;
 import com.crodrigo47.trelloBackend.dto.UserDto;
+import com.crodrigo47.trelloBackend.dto.UserSearchDto;
 import com.crodrigo47.trelloBackend.model.User;
 import com.crodrigo47.trelloBackend.service.UserService;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -38,7 +39,7 @@ class UserControllerTest {
     @Autowired MockMvc mockMvc;
     @Autowired ObjectMapper mapper;
 
-    //--------------------------SUCCESS TESTS CORREGIDOS--------------------------//
+    //--------------------------SUCCESS TESTS--------------------------//
 
     @Test
     void getAllUsers_returnsJsonList() throws Exception {
@@ -114,6 +115,37 @@ class UserControllerTest {
         verify(userService).deleteUser(userId);
     }
 
+        // -------------------------- SEARCH USERS -------------------------- //
+    @Test
+    void searchUsers_returnsListOfUserSearchDto() throws Exception {
+        User current = User.builder().id(1L).username("alice").role(User.Role.USER).build();
+
+        UserSearchDto s1 = new UserSearchDto(2L, "alice2");
+        UserSearchDto s2 = new UserSearchDto(3L, "alicex");
+
+        when(userService.getUserByUsername("alice")).thenReturn(Optional.of(current));
+        when(userService.searchUsersByPrefix("ali", 10)).thenReturn(List.of(s1, s2));
+
+        // setear SecurityContext para que @AuthenticationPrincipal sea resuelto dentro del controller
+        var auth = new UsernamePasswordAuthenticationToken("alice", null);
+        org.springframework.security.core.context.SecurityContextHolder.setContext(
+            new org.springframework.security.core.context.SecurityContextImpl(auth)
+        );
+
+        try {
+            mockMvc.perform(get("/users/search")
+                        .param("username", "ali"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(s1.id()))
+                .andExpect(jsonPath("$[0].username").value(s1.username()))
+                .andExpect(jsonPath("$[1].id").value(s2.id()))
+                .andExpect(jsonPath("$[1].username").value(s2.username()));
+        } finally {
+            org.springframework.security.core.context.SecurityContextHolder.clearContext();
+        }
+    }
+
+
     //--------------------------ERROR TESTS--------------------------//
 
     @Test
@@ -147,5 +179,4 @@ class UserControllerTest {
                 .content(mapper.writeValueAsString(body)))
                 .andExpect(status().is4xxClientError());
     }
-
 }
